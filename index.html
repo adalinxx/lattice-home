@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lattice — One proof. Every chain.</title>
+<meta name="description" content="Lattice is a lattice of independent chains secured by one merged proof of work. Heaviest chain wins. No finality, no rulers.">
+<link rel="icon" href="./lattice-mark.svg">
+<link rel="stylesheet" href="./tokens.css">
+<style>
+  body { padding: 0 var(--s-4); }
+  main, nav { max-width: 880px; margin: 0 auto; }
+  nav { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-4) 0;
+    font-size: var(--fs-14); }
+  nav .links { margin-left: auto; display: flex; gap: var(--s-3); }
+  nav .links a { text-decoration: none; }
+  .hero { padding: var(--s-7) var(--s-4); margin: var(--s-2) 0 0;
+    border: var(--rule); text-align: center; }
+  .hero .wordmark { font-size: var(--fs-44); display: block; margin: 0 0 var(--s-2); }
+  .hero p { margin: 0 auto var(--s-4); }
+  .hero .actions { display: flex; gap: var(--s-2); justify-content: center; }
+  section { padding: var(--s-6) 0; border-top: var(--rule); }
+  section:first-of-type { border-top: 0; }
+  h2 { font-size: var(--fs-20); }
+  .claims { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-4); }
+  .claims h3 { font-size: var(--fs-16); text-transform: none; letter-spacing: 0; margin: 0 0 var(--s-2); }
+  .links-list { list-style: none; padding: 0; }
+  .links-list li { margin: 0 0 var(--s-2); }
+  footer { padding: var(--s-6) 0; border-top: var(--rule); font-size: var(--fs-12); }
+  @media (max-width: 640px) { .claims { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+  <nav>
+    <img src="./lattice-mark.svg" width="22" height="22" alt="">
+    <span class="wordmark">LATTICE</span>
+    <span class="links">
+      <a href="#run">Run</a>
+      <a href="#mine">Mine</a>
+      <a href="#build">Build</a>
+      <a href="#spec">Spec</a>
+      <a href="#code">Code</a>
+    </span>
+  </nav>
+
+<main>
+
+  <div class="hero lattice-bg">
+    <span class="wordmark">LATTICE</span>
+    <p>One proof of work secures a universe of blockchains.</p>
+    <div class="actions">
+      <a class="btn btn--primary" href="#run">Run a node</a>
+      <a class="btn" href="#spec">Read the spec</a>
+    </div>
+  </div>
+
+  <section>
+    <div class="claims">
+      <div>
+        <h3>Security on day one</h3>
+        <p>Every chain inherits the network's full proof of work from block zero — no miners to recruit, no validator set to bootstrap, no cold-start attack window.</p>
+      </div>
+      <div>
+        <h3>Your chain, your rules</h3>
+        <p>Launch a sovereign chain with its own policy, permissionlessly. No slot auction, no gatekeeper — and nobody is forced to carry it.</p>
+      </div>
+      <div>
+        <h3>Mine once, earn everywhere</h3>
+        <p>One search secures every chain you subscribe to and earns on each it clears. Hashpower stops being fragmented across competing chains.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="run">
+    <h2>Run a node</h2>
+    <p>The full node serves RPC, gossip, trustless sync, mempool, and child-chain deploy. Mining is external — the node serves block templates and runs no mining loop.</p>
+<pre><code>git clone https://github.com/adalinxx/lattice-node
+cd lattice-node
+swift build -c release
+.build/release/node --help</code></pre>
+    <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md">Getting started</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/operations.md">Operations</a></p>
+  </section>
+
+  <section id="mine">
+    <h2>Mine</h2>
+    <p>Mining lives in a separate process. The node hands out templates; the <code>lattice-miner</code> worker — bundled with lattice-node — searches the easiest target across the chains you subscribe to, and each solution is accepted by whichever chains it clears.</p>
+    <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md">Run a miner</a></p>
+  </section>
+
+  <section id="build">
+    <h2>Build a chain</h2>
+    <p>Deploy a child chain under any parent and define its validity with a policy — opt-in, chain-defined rules enforced by every subscriber. Policies are deterministic validity, not permissionless contracts.</p>
+    <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/rpc-api.md">RPC API</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/protocol.md">Protocol</a></p>
+  </section>
+
+  <section id="spec">
+    <h2>Spec &amp; security</h2>
+    <p>Consensus is Hierarchical GHOST — the heaviest descendant subtree, rooted upward toward an absolute proof-of-work root. Security rests on independent per-chain validation and voluntary subscription, not on trusting any one chain or operator.</p>
+    <ul class="links-list">
+      <li><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/protocol.md">Protocol specification</a></li>
+      <li><a href="https://github.com/adalinxx/Lattice">Consensus (Lattice)</a></li>
+    </ul>
+  </section>
+
+  <section id="code">
+    <h2>Code</h2>
+    <ul class="links-list">
+      <li><a href="https://github.com/adalinxx/lattice-node">lattice-node</a> — full node (RPC, gossip, sync, mempool, persistence) + external miner (LatticeMiner)</li>
+      <li><a href="https://github.com/adalinxx/Lattice">Lattice</a> — consensus (Hierarchical GHOST)</li>
+      <li><a href="https://github.com/adalinxx/Ivy">Ivy</a> — peer-to-peer networking</li>
+      <li><a href="https://github.com/adalinxx/VolumeBroker">VolumeBroker</a> — content-addressed storage</li>
+      <li><a href="https://github.com/adalinxx/cashew">cashew</a> — content-addressed store (CAS)</li>
+      <li><a href="https://github.com/adalinxx/Tally">Tally</a> — peer reputation</li>
+    </ul>
+  </section>
+
+</main>
+
+  <footer>
+    <span class="wordmark">LATTICE</span>
+  </footer>
+
+</body>
+</html>
