@@ -85,8 +85,8 @@ swift build -c release
 
   <section id="mine">
     <h2>Mine</h2>
-    <p>Mining lives in a separate process. The node hands out templates; the <code>lattice-miner</code> worker — bundled with lattice-node — searches the easiest target across the chains you subscribe to, and each solution is accepted by whichever chains it clears.</p>
-    <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md">Run a miner</a></p>
+    <p>Mining lives in a separate process. The node hands out templates; a worker — driven by the coordinator via <code>--worker-executable</code> — searches the easiest target across the chains you subscribe to, and each solution is accepted by whichever chains it clears. The bundled <code>lattice-miner</code> is a CPU worker; <a href="https://github.com/adalinxx/lattice-miner-gpu">lattice-miner-gpu</a> is a GPU worker (Apple Silicon / Metal). Any miner that implements the worker protocol plugs in.</p>
+    <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md">Run a miner</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/mining-worker-protocol.md">Worker protocol</a></p>
   </section>
 
   <section id="build">
@@ -107,7 +107,8 @@ swift build -c release
   <section id="code">
     <h2>Code</h2>
     <ul class="links-list">
-      <li><a href="https://github.com/adalinxx/lattice-node">lattice-node</a> — full node (RPC, gossip, sync, mempool, persistence) + external miner (LatticeMiner)</li>
+      <li><a href="https://github.com/adalinxx/lattice-node">lattice-node</a> — full node (RPC, gossip, sync, mempool, persistence) + CPU miner (lattice-miner)</li>
+      <li><a href="https://github.com/adalinxx/lattice-miner-gpu">lattice-miner-gpu</a> — GPU proof-of-work miner (Metal; CUDA planned)</li>
       <li><a href="https://github.com/adalinxx/Lattice">Lattice</a> — consensus (Hierarchical GHOST)</li>
       <li><a href="https://github.com/adalinxx/Ivy">Ivy</a> — peer-to-peer networking</li>
       <li><a href="https://github.com/adalinxx/VolumeBroker">VolumeBroker</a> — content-addressed storage</li>
