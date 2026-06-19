@@ -55,7 +55,6 @@
       <thead><tr><th>Region</th><th>RPC</th><th>Height</th><th>Peers</th><th>Status</th></tr></thead>
       <tbody id="mainnet-rows"></tbody>
     </table>
-    <p class="meta">genesis <span id="mainnet-genesis">…</span></p>
   </section>
 
   <section>
@@ -64,7 +63,7 @@
       <thead><tr><th>Region</th><th>RPC</th><th>Height</th><th>Peers</th><th>Status</th></tr></thead>
       <tbody id="testnet-rows"></tbody>
     </table>
-    <p class="meta">genesis <span id="testnet-genesis">…</span> · faucet <a href="https://lattice-testnet-faucet.fly.dev">lattice-testnet-faucet.fly.dev</a></p>
+    <p class="meta">faucet <a href="https://lattice-testnet-faucet.fly.dev">lattice-testnet-faucet.fly.dev</a></p>
   </section>
 
   <footer>
@@ -106,7 +105,6 @@
 
   async function poll() {
     for (const [net, nodes] of Object.entries(NETWORKS)) {
-      let genesis = "";
       await Promise.all(nodes.map(async ([region, url], i) => {
         const tr = document.getElementById(`${net}-${i}`);
         const cell = (k) => tr.querySelector(`[data-cell="${k}"]`);
@@ -117,7 +115,6 @@
           cell("height").textContent = (d.chainHeight ?? "—").toLocaleString();
           cell("peers").textContent = d.peerCount ?? "—";
           cell("status").innerHTML = `<span class="dot"></span>${d.status ?? "—"}`;
-          if (d.genesisHash) genesis = d.genesisHash;
         } catch (e) {
           tr.classList.add("down");
           cell("height").textContent = "—";
@@ -125,8 +122,6 @@
           cell("status").innerHTML = `<span class="dot"></span>unreachable`;
         }
       }));
-      const g = document.getElementById(net + "-genesis");
-      if (genesis) g.textContent = genesis;
     }
   }
 
