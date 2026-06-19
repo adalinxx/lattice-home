@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lattice — Wallet</title>
+<meta name="description" content="A minimal non-custodial wallet for the Lattice network. Keys never leave your browser.">
+<link rel="icon" href="./lattice-mark.svg">
+<link rel="stylesheet" href="./tokens.css">
+<style>
+  body { padding: 0 var(--s-4); }
+  main, nav { max-width: 720px; margin: 0 auto; }
+  nav { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-4) 0; font-size: var(--fs-14); }
+  nav .wordmark a { text-decoration: none; color: inherit; }
+  nav .links { margin-left: auto; display: flex; gap: var(--s-3); }
+  nav .links a { text-decoration: none; }
+  section { padding: var(--s-5) 0; border-top: var(--rule); }
+  section:first-of-type { border-top: 0; }
+  h2 { font-size: var(--fs-20); margin: 0 0 var(--s-3); }
+  label { display: block; font-size: var(--fs-12); margin: var(--s-2) 0 var(--s-1); }
+  input, textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: var(--fs-14);
+    padding: var(--s-2); border: var(--rule); background: transparent; color: inherit; }
+  textarea { min-height: 4.5em; resize: vertical; font-family: ui-monospace, monospace; font-size: var(--fs-12); }
+  .row { display: flex; gap: var(--s-2); }
+  .row > * { flex: 1; }
+  .mono { font-family: ui-monospace, monospace; font-size: var(--fs-12); word-break: break-all; }
+  .big { font-size: var(--fs-20); font-variant-numeric: tabular-nums; }
+  .muted { font-size: var(--fs-12); opacity: .7; }
+  .msg { font-size: var(--fs-12); margin-top: var(--s-2); word-break: break-all; }
+  .ok { } .err { font-weight: 600; }
+  .hidden { display: none; }
+  button { margin-top: var(--s-2); }
+  table { width: 100%; border-collapse: collapse; font-size: var(--fs-12); }
+  td { padding: var(--s-1) var(--s-2); border-bottom: var(--rule); }
+  footer { padding: var(--s-5) 0; border-top: var(--rule); font-size: var(--fs-12); }
+</style>
+</head>
+<body>
+
+  <nav>
+    <img src="./lattice-mark.svg" width="22" height="22" alt="">
+    <span class="wordmark"><a href="./">LATTICE</a></span>
+    <span class="links">
+      <a href="./#run">Run</a>
+      <a href="./status.html">Status</a>
+      <a href="./wallet.html">Wallet</a>
+      <a href="https://github.com/adalinxx/lattice-node">Code</a>
+    </span>
+  </nav>
+
+<main>
+
+  <section>
+    <h2>Wallet</h2>
+    <p class="muted">Non-custodial. Your key stays in this browser tab — only signatures are sent to the node. Paste a key from <code>lattice-node keys generate</code>. For real value, prefer a native/hardware wallet.</p>
+    <label>Node RPC</label>
+    <input id="rpc" value="https://lattice-mainnet-iad.fly.dev" spellcheck="false">
+  </section>
+
+  <section>
+    <h2>Account</h2>
+    <div id="no-account">
+      <label>Key JSON <span class="muted">(needs address, publicKey, privateKey)</span></label>
+      <textarea id="keyjson" placeholder='{"address":"bafyrei…","publicKey":"ed01…","privateKey":"…"}' spellcheck="false"></textarea>
+      <button class="btn btn--primary" id="load">Load account</button>
+    </div>
+    <div id="have-account" class="hidden">
+      <label>Address</label>
+      <div class="mono" id="addr"></div>
+      <label>Balance</label>
+      <div class="big"><span id="bal">…</span> <span class="muted">tokens</span> · <button class="btn" id="refresh">Refresh</button> · <button class="btn" id="logout">Forget</button></div>
+    </div>
+    <div class="msg" id="acct-msg"></div>
+  </section>
+
+  <section id="send-section" class="hidden">
+    <h2>Send</h2>
+    <label>Recipient address</label>
+    <input id="to" placeholder="bafyrei…" spellcheck="false">
+    <div class="row">
+      <div><label>Amount</label><input id="amount" type="number" min="0" value="1000"></div>
+      <div><label>Fee</label><input id="fee" type="number" min="0" value="1000"></div>
+    </div>
+    <button class="btn btn--primary" id="send">Sign &amp; send</button>
+    <div class="msg" id="send-msg"></div>
+  </section>
+
+  <section id="history-section" class="hidden">
+    <h2>Recent transactions</h2>
+    <table><tbody id="history"></tbody></table>
+  </section>
+
+  <footer>
+    Talks to the node's public RPC (<code>/api/transaction/prepare</code> → sign → <code>/api/transaction</code>). Block cadence is ~1h, so a sent tx sits in the mempool until the next block.
+  </footer>
+
+</main>
+
+<script type="module">
+  import * as ed from 'https://esm.sh/@noble/ed25519@2';
+  import { sha512 } from 'https://esm.sh/@noble/hashes@1/sha512';
+  ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m));
+
+  const $ = id => document.getElementById(id);
+  const rpc = () => $('rpc').value.replace(/\/+$/, '');
+  const hexToBytes = h => Uint8Array.from(h.match(/../g).map(b => parseInt(b, 16)));
+  const bytesToHex = b => Array.from(b).map(x => x.toString(16).padStart(2, '0')).join('');
+  let acct = null; // { address, publicKey, privateKey }
+
+  async function rpcGet(path) {
+    const r = await fetch(rpc() + path, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`${path} → HTTP ${r.status}`);
+    return r.json();
+  }
+  async function rpcPost(path, body) {
+    const r = await fetch(rpc() + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || `${path} → HTTP ${r.status}`);
+    return j;
+  }
+
+  $('load').onclick = () => {
+    const m = $('acct-msg'); m.textContent = '';
+    try {
+      const k = JSON.parse($('keyjson').value);
+      if (!k.address || !k.publicKey || !k.privateKey) throw new Error('JSON must have address, publicKey, privateKey');
+      acct = k;
+      $('addr').textContent = k.address;
+      $('no-account').classList.add('hidden');
+      $('have-account').classList.remove('hidden');
+      $('send-section').classList.remove('hidden');
+      $('history-section').classList.remove('hidden');
+      $('keyjson').value = '';
+      refresh();
+    } catch (e) { m.className = 'msg err'; m.textContent = 'Could not load: ' + e.message; }
+  };
+
+  $('logout').onclick = () => {
+    acct = null;
+    $('no-account').classList.remove('hidden');
+    $('have-account').classList.add('hidden');
+    $('send-section').classList.add('hidden');
+    $('history-section').classList.add('hidden');
+  };
+
+  async function refresh() {
+    try {
+      const b = await rpcGet(`/api/balance/${acct.address}`);
+      $('bal').textContent = Number(b.balance).toLocaleString();
+      loadHistory();
+    } catch (e) { $('bal').textContent = '—'; $('acct-msg').className = 'msg err'; $('acct-msg').textContent = e.message; }
+  }
+  $('refresh').onclick = refresh;
+
+  async function loadHistory() {
+    try {
+      const h = await rpcGet(`/api/transactions/${acct.address}`);
+      const txs = (h.transactions || h.txs || h || []);
+      $('history').innerHTML = (Array.isArray(txs) ? txs.slice(0, 10) : []).map(t =>
+        `<tr><td class="mono">${(t.cid || t.txCID || '').slice(0, 24)}…</td><td>${t.height ?? ''}</td></tr>`
+      ).join('') || '<tr><td class="muted">none yet</td></tr>';
+    } catch (e) { $('history').innerHTML = `<tr><td class="muted">history unavailable</td></tr>`; }
+  }
+
+  $('send').onclick = async () => {
+    const m = $('send-msg'); m.className = 'msg'; m.textContent = 'Working…';
+    try {
+      const to = $('to').value.trim();
+      const amount = parseInt($('amount').value, 10);
+      const fee = parseInt($('fee').value, 10);
+      if (!to) throw new Error('recipient required');
+      if (!(amount >= 0) || !(fee >= 0)) throw new Error('amount/fee invalid');
+
+      const { nonce } = await rpcGet(`/api/nonce/${acct.address}?chainPath=Nexus`);
+      const prep = await rpcPost('/api/transaction/prepare', {
+        accountActions: [{ owner: acct.address, delta: -(amount + fee) }, { owner: to, delta: amount }],
+        signers: [acct.address], fee, nonce, chainPath: ['Nexus']
+      });
+      const msg = new TextEncoder().encode('lattice-tx-v1:' + prep.signingPreimage);
+      const sig = bytesToHex(ed.sign(msg, hexToBytes(acct.privateKey)));
+      const res = await rpcPost('/api/transaction', {
+        signatures: { [acct.publicKey]: sig }, bodyCID: prep.bodyCID, bodyData: prep.bodyData, chainPath: ['Nexus']
+      });
+      m.className = 'msg ok';
+      m.innerHTML = res.accepted ? `Accepted — tx <span class="mono">${res.txCID}</span>. Confirms in the next block.` : `Submitted: ${JSON.stringify(res)}`;
+      setTimeout(refresh, 500);
+    } catch (e) { m.className = 'msg err'; m.textContent = 'Failed: ' + e.message; }
+  };
+</script>
+
+</body>
+</html>
