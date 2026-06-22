@@ -70,6 +70,25 @@ th { font-weight: 600; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 code, pre { font-family: var(--font); }
 
+/* inline code — a hairline chip so it reads as code without color */
+:not(pre) > code { border: var(--rule); padding: 0 var(--s-1); font-size: 0.9em; }
+
+/* code panel — the inverted body reads unmistakably as a terminal.
+   Same ink/paper inversion as .btn--primary; still monochrome, hairline, radius 0.
+   A light title bar over a dark body is the only "window chrome" we draw. */
+figure.term { margin: var(--s-4) 0; border: var(--rule); }
+figure.term figcaption {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-2) var(--s-3); border-bottom: var(--rule);
+  font-size: var(--fs-12); text-transform: uppercase; letter-spacing: var(--track-display); }
+figure.term figcaption::before { content: "$"; }      /* the terminal glyph */
+figure.term figcaption::after  { content: "\25AE"; margin-left: auto; }  /* parked block cursor */
+figure.term pre {
+  margin: 0; padding: var(--s-3); overflow-x: auto;
+  background: var(--ink); color: var(--paper);
+  font-size: var(--fs-14); line-height: var(--lh-body); }
+figure.term pre code { border: 0; padding: 0; font-size: inherit; color: inherit; }
+
 /* the one permitted "graphic": the dot-lattice. use once (hero/footer). */
 .lattice-bg { background-image: radial-gradient(var(--line) 1px, transparent 1px);
   background-size: var(--s-2) var(--s-2); }

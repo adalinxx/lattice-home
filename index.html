@@ -60,15 +60,15 @@
     <div class="claims">
       <div>
         <h3>Security on day one</h3>
-        <p>Every chain inherits the network's full proof of work from block zero — no miners to recruit, no validator set to bootstrap, no cold-start attack window.</p>
+        <p>Every chain inherits the network's full proof of work from block zero. No validator set to bootstrap, no cold-start attack window.</p>
       </div>
       <div>
         <h3>Your chain, your rules</h3>
-        <p>Launch a sovereign chain with its own policy, permissionlessly. No slot auction, no gatekeeper — and nobody is forced to carry it.</p>
+        <p>Launch a sovereign chain with its own policy in one command, no permission needed.</p>
       </div>
       <div>
         <h3>Mine once, earn everywhere</h3>
-        <p>One search secures every chain you subscribe to and earns on each it clears. Hashpower stops being fragmented across competing chains.</p>
+        <p>Your miner runs one search, not one per chain. It secures every chain you subscribe to and pays out on each one it clears, instead of splitting your hashpower across competing chains.</p>
       </div>
     </div>
   </section>
@@ -76,22 +76,58 @@
   <section id="run">
     <h2>Run a node</h2>
     <p>The full node serves RPC, gossip, trustless sync, mempool, and child-chain deploy. Mining is external — the node serves block templates and runs no mining loop.</p>
+<figure class="term">
+<figcaption>run a node</figcaption>
 <pre><code>git clone https://github.com/adalinxx/lattice-node
 cd lattice-node
 swift build -c release
-.build/release/node --help</code></pre>
+
+# Join the network. --min-peer-key-bits 16 is required to peer with the seeds.
+.build/release/node --autosize --rpc-port 8080 --min-peer-key-bits 16
+
+# In another shell, confirm it's up and syncing:
+curl http://localhost:8080/api/chain/info</code></pre>
+</figure>
     <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md">Getting started</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/operations.md">Operations</a></p>
   </section>
 
   <section id="mine">
     <h2>Mine</h2>
     <p>Mining lives in a separate process. The node hands out templates; a worker — driven by the coordinator via <code>--worker-executable</code> — searches the easiest target across the chains you subscribe to, and each solution is accepted by whichever chains it clears. The bundled <code>lattice-miner</code> is a CPU worker; <a href="https://github.com/adalinxx/lattice-miner-gpu">lattice-miner-gpu</a> is a GPU worker (Apple Silicon / Metal). Any miner that implements the worker protocol plugs in.</p>
+<figure class="term">
+<figcaption>attach a miner</figcaption>
+<pre><code># Point the coordinator at a running node; it spawns CPU miner workers.
+lattice-mining-coordinator \
+  --node http://127.0.0.1:8080/api \
+  --rpc-cookie-file ~/.lattice/.cookie \
+  --worker-executable "$(command -v lattice-miner)" \
+  --workers 2</code></pre>
+</figure>
     <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md">Run a miner</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/mining-worker-protocol.md">Worker protocol</a></p>
   </section>
 
   <section id="build">
     <h2>Build a chain</h2>
     <p>Deploy a child chain under any parent and define its validity with a policy — opt-in, chain-defined rules enforced by every subscriber. Policies are deterministic validity, not permissionless contracts.</p>
+<figure class="term">
+<figcaption>deploy a chain</figcaption>
+<pre><code># Deploy a child chain under Nexus (privileged — uses the node's RPC cookie).
+curl -X POST http://localhost:8080/api/chain/deploy \
+  -H "Authorization: Bearer $(cat ~/.lattice/.cookie)" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "directory": "Payments",
+    "parentDirectory": "Nexus",
+    "targetBlockTime": 3600000,
+    "initialReward": 1048576,
+    "halvingInterval": 876600,
+    "maxTransactionsPerBlock": 5000,
+    "maxStateGrowth": 3000000,
+    "maxBlockSize": 10000000,
+    "retargetWindow": 100,
+    "wasmPolicies": []
+  }'</code></pre>
+</figure>
     <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/rpc-api.md">RPC API</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/protocol.md">Protocol</a></p>
   </section>
 
