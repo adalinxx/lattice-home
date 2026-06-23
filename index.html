@@ -128,6 +128,7 @@ curl -X POST http://localhost:8080/api/chain/deploy \
     "wasmPolicies": []
   }'</code></pre>
 </figure>
+    <p>Deploy seeds the chain locally and returns its genesis. It becomes discoverable to every node once you <strong>announce</strong> it with a genesis-action transaction — an ordinary mempool tx, so any miner can carry the announcement and it survives your node going offline. The parent records only the opaque <code>{directory, genesis-CID}</code> anchor; it never judges the child's contents.</p>
     <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/rpc-api.md">RPC API</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/protocol.md">Protocol</a></p>
   </section>
 
