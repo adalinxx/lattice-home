@@ -1,0 +1,88 @@
+/* Explorer scaffolding only — all visual primitives come from tokens.css
+   (the Lattice design system: monochrome, monospace, hairlines, radius 0,
+   zero accent, the grid is the only graphic). Nothing here introduces color,
+   shadow, gradient, or radius. */
+
+.wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 var(--s-4); }
+
+/* ---- top bar: hairline base, no blur/shadow ---- */
+.topbar { position: sticky; top: 0; z-index: 10; background: var(--paper); border-bottom: var(--rule); }
+.topbar .wrap { display: flex; align-items: center; gap: var(--s-4); min-height: 64px; }
+.brand { display: flex; align-items: center; gap: var(--s-2); text-decoration: none; white-space: nowrap; }
+.brand .wordmark { font-size: var(--fs-20); }
+.brand-sub { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: var(--track-display); }
+.brand:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.search { flex: 1; display: flex; align-items: flex-end; gap: var(--s-3); min-width: 0; }
+.search input { flex: 1; min-width: 0; }
+.search button { white-space: nowrap; }
+
+#chain-select { max-width: 200px; }
+
+/* ---- network status strip ---- */
+.net-status { border-bottom: var(--rule); }
+.net-status .wrap { display: flex; flex-wrap: wrap; gap: var(--s-4); align-items: center;
+  padding: var(--s-2) var(--s-4); font-size: var(--fs-12); text-transform: uppercase; letter-spacing: 0.04em; }
+.net-status b { font-weight: 600; text-transform: none; letter-spacing: 0; font-size: var(--fs-14); }
+
+/* status glyph: hollow square = nominal, ink-filled = alert (monochrome, no color) */
+.dot { display: inline-block; width: 8px; height: 8px; border: var(--rule); margin-right: var(--s-1); vertical-align: baseline; }
+.dot.degraded, .dot.unhealthy, .dot.down { background: var(--ink); border-color: var(--ink); }
+
+/* ---- main ---- */
+main { padding: var(--s-5) var(--s-4) var(--s-6); }
+.sub { font-size: var(--fs-14); margin: calc(-1 * var(--s-2)) 0 var(--s-5); }
+h1 { font-size: var(--fs-28); }
+h2 { font-size: var(--fs-20); margin: var(--s-5) 0 var(--s-3); }
+
+/* ---- stat block: a single hairline block, cells divided by hairlines
+   (the system has no cards) ---- */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); border: var(--rule); }
+.card { padding: var(--s-3); border-right: var(--rule); border-bottom: var(--rule); }
+.card .k { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: var(--track-display); }
+.card .v { font-size: var(--fs-20); font-weight: 600; margin-top: var(--s-1); }
+.card .v.mono { font-size: var(--fs-14); font-weight: 400; }
+
+/* ---- tables (extend tokens) ---- */
+.table-wrap { border: var(--rule); }
+.table-wrap th, .table-wrap td { border-bottom: var(--rule); }
+.table-wrap tr:last-child td { border-bottom: 0; }
+.table-wrap thead th { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: 0.04em; }
+tbody tr:hover td { background: var(--line); }
+.new-row td { animation: rowin 120ms linear; }
+@keyframes rowin { from { background: var(--ink); } to { background: transparent; } }
+
+/* ---- key/value detail: hairline rows, label uppercase ---- */
+.kv { border: var(--rule); }
+.kv .row { display: grid; grid-template-columns: 220px 1fr; border-bottom: var(--rule); }
+.kv .row:last-child { border-bottom: 0; }
+.kv .row > div { padding: var(--s-2) var(--s-3); }
+.kv .row .key { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: var(--track-display); }
+.kv .row .val { word-break: break-all; }
+
+/* ---- pill: hairline box; invert for emphasis (never color) ---- */
+.pill { display: inline-block; padding: 0 var(--s-2); border: var(--rule); font-size: var(--fs-12);
+  text-transform: uppercase; letter-spacing: 0.04em; }
+.pill.bad, .pill--invert { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+.mono { font-family: var(--font); }
+.delta { font-variant-numeric: tabular-nums; }
+.crumbs { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: var(--track-display); margin-bottom: var(--s-3); }
+button.more { margin-top: var(--s-3); }
+.empty, .spinner { font-size: var(--fs-14); padding: var(--s-4) 0; }
+.error { border: var(--rule); padding: var(--s-3); }
+code.cid { font-size: var(--fs-14); }
+
+/* ---- footer ---- */
+.footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s-3);
+  padding-top: var(--s-4); padding-bottom: var(--s-5); margin-top: var(--s-5); border-top: var(--rule); }
+.footer nav a { text-decoration: none; }
+.footer nav a + a::before { content: " / "; opacity: 0.5; }
+
+@media (max-width: 640px) {
+  .topbar .wrap { flex-wrap: wrap; padding-top: var(--s-2); padding-bottom: var(--s-2); }
+  .search { order: 3; flex-basis: 100%; }
+  .kv .row { grid-template-columns: 1fr; }
+  .kv .row .key { padding-bottom: 0; }
+  .hide-sm { display: none; }
+}
