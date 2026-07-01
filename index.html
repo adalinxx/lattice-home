@@ -6,15 +6,81 @@
 <title>Lattice - Launch your own blockchain</title>
 <meta name="description" content="Lattice is a toolkit for launching your own sovereign blockchain, secured from day one by a shared merged proof of work.">
 <link rel="icon" href="./lattice-mark.svg">
-<link rel="stylesheet" href="./tokens.css">
+<!-- Styles are inlined so this self-contained page paints in one request,
+     with no render-blocking stylesheet round-trip. -->
 <style>
+/* === design tokens === */
+:root {
+  --paper:    #ffffff;
+  --ink:      #0a0a0a;  /* full ink: headings, wordmark, UI */
+  --ink-soft: #333333;  /* body copy: softer than pure black, less glare */
+  --line:     #e6e6e6;
+  --font: ui-monospace, "Berkeley Mono", "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  --fs-12: 0.75rem;  --fs-14: 0.875rem; --fs-16: 1rem;
+  --fs-20: 1.25rem;  --fs-28: 1.75rem;  --fs-44: 2.75rem;
+  --lh-body: 1.6; --lh-display: 1.1; --track-display: 0.08em;
+  --s-1: 4px; --s-2: 8px; --s-3: 16px; --s-4: 24px;
+  --s-5: 40px; --s-6: 64px; --s-7: 96px;
+  --rule: 1px solid var(--line);
+  --radius: 0;
+  --measure: 66ch;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --paper: #0a0a0a; --ink: #ededed; --ink-soft: #bdbdbd; --line: #1c1c1c; }
+}
+* { box-sizing: border-box; }
+html { font-family: var(--font); font-size: 18px; line-height: var(--lh-body);
+  -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--paper); color: var(--ink);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+h1, h2, h3 { text-transform: uppercase; letter-spacing: var(--track-display);
+  line-height: var(--lh-display); font-weight: 600; margin: 0 0 var(--s-3); }
+h1 { font-size: var(--fs-44); }
+h2 { font-size: var(--fs-28); }
+h3 { font-size: var(--fs-20); }
+p, li { max-width: var(--measure); margin: 0 0 var(--s-3); color: var(--ink-soft); }
+small, .meta { font-size: var(--fs-12); }
+a { color: inherit; text-decoration: underline; text-underline-offset: 2px;
+  text-decoration-thickness: 1px; }
+a:focus-visible, button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--ink); outline-offset: 2px; }
+hr { border: 0; border-top: var(--rule); margin: var(--s-5) 0; }
+button, .btn { font: inherit; text-transform: uppercase; letter-spacing: var(--track-display);
+  background: transparent; color: var(--ink); border: var(--rule);
+  border-radius: var(--radius); padding: var(--s-2) var(--s-3); cursor: pointer; }
+.btn--primary { background: var(--ink); color: var(--paper); }
+.btn:hover { background: var(--ink); color: var(--paper); }
+input, textarea, select { font: inherit; color: var(--ink); background: transparent;
+  border: 0; border-bottom: var(--rule); border-radius: 0; padding: var(--s-2) 0; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: var(--s-2) var(--s-3); border-bottom: var(--rule); }
+th { font-weight: 600; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+code, pre { font-family: var(--font); }
+:not(pre) > code { border: var(--rule); padding: 0 var(--s-1); font-size: 0.9em; }
+figure.term { margin: var(--s-4) 0; border: var(--rule); }
+figure.term figcaption {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-2) var(--s-3); border-bottom: var(--rule);
+  font-size: var(--fs-12); text-transform: uppercase; letter-spacing: var(--track-display); }
+figure.term figcaption::before { content: "$"; }
+figure.term figcaption::after  { content: "\25AE"; margin-left: auto; }
+figure.term pre {
+  margin: 0; padding: var(--s-3); overflow-x: auto;
+  background: var(--ink); color: var(--paper);
+  font-size: var(--fs-14); line-height: var(--lh-body); }
+figure.term pre code { border: 0; padding: 0; font-size: inherit; color: inherit; }
+.lattice-bg { background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: var(--s-2) var(--s-2); }
+.wordmark { text-transform: uppercase; letter-spacing: var(--track-display); font-weight: 600; }
+
+/* === page === */
   body { padding: 0 var(--s-4); }
   main, nav { max-width: 880px; margin: 0 auto; }
-  nav { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-4) 0;
-    font-size: var(--fs-14); }
-  nav .links { margin-left: auto; display: flex; gap: var(--s-3); }
-  nav .links a { text-decoration: none; }
-  .hero { padding: var(--s-7) var(--s-4); margin: var(--s-2) 0 0;
+  nav { display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-4) 0; font-size: var(--fs-14); }
+  nav a { text-decoration: none; }
+  .hero { padding: var(--s-7) var(--s-4); margin: var(--s-4) 0 0;
     border: var(--rule); text-align: center; }
   .hero .wordmark { font-size: var(--fs-44); display: block; margin: 0 0 var(--s-2); }
   .hero p { margin: 0 auto var(--s-4); }
@@ -26,23 +92,24 @@
   .claims h3 { font-size: var(--fs-16); text-transform: none; letter-spacing: 0; margin: 0 0 var(--s-2); }
   .links-list { list-style: none; padding: 0; }
   .links-list li { margin: 0 0 var(--s-2); }
-  footer { padding: var(--s-6) 0; border-top: var(--rule); font-size: var(--fs-12); }
+  footer { display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-6) 0; border-top: var(--rule); font-size: var(--fs-12); }
+  footer .links { margin-left: auto; display: flex; gap: var(--s-3); }
+  #network table { font-size: var(--fs-14); margin-top: var(--s-3); }
+  #network td a { text-decoration: none; }
+  #network tr.down td { opacity: .45; }
+  #network .dot { display: inline-block; width: .55em; height: .55em; border-radius: 50%;
+    background: currentColor; margin-right: .4em; vertical-align: baseline; }
   @media (max-width: 640px) { .claims { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 
   <nav>
-    <img src="./lattice-mark.svg" width="22" height="22" alt="">
-    <span class="wordmark">LATTICE</span>
-    <span class="links">
-      <a href="#run">Run</a>
-      <a href="#mine">Mine</a>
-      <a href="#build">Build</a>
-      <a href="#spec">Spec</a>
-      <a href="./status.html">Status</a>
-      <a href="#code">Code</a>
-    </span>
+    <a href="#quickstart">Quickstart</a>
+    <a href="#build">Build</a>
+    <a href="#spec">Spec</a>
+    <a href="#network">Network</a>
   </nav>
 
 <main>
@@ -51,7 +118,7 @@
     <span class="wordmark">LATTICE</span>
     <p>Launch your own blockchain.</p>
     <div class="actions">
-      <a class="btn btn--primary" href="#run">Run a node</a>
+      <a class="btn btn--primary" href="#quickstart">Run a node</a>
       <a class="btn" href="#spec">Read the spec</a>
     </div>
   </div>
@@ -73,9 +140,9 @@
     </div>
   </section>
 
-  <section id="run">
-    <h2>Run a node</h2>
-    <p>The full node serves RPC, gossip, trustless sync, mempool, and child-chain deploy. Mining is external — the node serves block templates and runs no mining loop.</p>
+  <section id="quickstart">
+    <h2>Quickstart</h2>
+    <p>The full node serves RPC, gossip, trustless sync, mempool, and child-chain deploy. Mining is external — the node serves block templates and runs no mining loop, so you bring up a node first and then point a miner at it.</p>
 <figure class="term">
 <figcaption>run a node</figcaption>
 <pre><code>git clone https://github.com/adalinxx/lattice-node
@@ -88,12 +155,7 @@ swift build -c release
 # In another shell, confirm it's up and syncing:
 curl http://localhost:8080/api/chain/info</code></pre>
 </figure>
-    <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md">Getting started</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/operations.md">Operations</a></p>
-  </section>
-
-  <section id="mine">
-    <h2>Mine</h2>
-    <p>Mining lives in a separate process. The node hands out templates; a worker — driven by the coordinator via <code>--worker-executable</code> — searches the easiest target across the chains you subscribe to, and each solution is accepted by whichever chains it clears. The bundled <code>lattice-miner</code> is a CPU worker; <a href="https://github.com/adalinxx/lattice-miner-gpu">lattice-miner-gpu</a> is a GPU worker that auto-detects CUDA (NVIDIA), Metal (Apple), or OpenCL (AMD/Intel). Any miner that implements the worker protocol plugs in.</p>
+    <p>With a node running, attach a miner. Mining lives in a separate process: the node hands out templates; a worker — driven by the coordinator via <code>--worker-executable</code> — searches the easiest target across the chains you subscribe to, and each solution is accepted by whichever chains it clears. The bundled <code>lattice-miner</code> is a CPU worker; <a href="https://github.com/adalinxx/lattice-miner-gpu">lattice-miner-gpu</a> is a GPU worker that auto-detects CUDA (NVIDIA), Metal (Apple), or OpenCL (AMD/Intel). Any miner that implements the worker protocol plugs in.</p>
 <figure class="term">
 <figcaption>attach a miner</figcaption>
 <pre><code># Point the coordinator at a running node; it spawns CPU miner workers.
@@ -103,7 +165,7 @@ lattice-mining-coordinator \
   --worker-executable "$(command -v lattice-miner)" \
   --workers 2</code></pre>
 </figure>
-    <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md">Run a miner</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/mining-worker-protocol.md">Worker protocol</a></p>
+    <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md">Getting started</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/operations.md">Operations</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/mining-worker-protocol.md">Worker protocol</a></p>
   </section>
 
   <section id="build">
@@ -141,24 +203,75 @@ curl -X POST http://localhost:8080/api/chain/deploy \
     </ul>
   </section>
 
-  <section id="code">
-    <h2>Code</h2>
-    <ul class="links-list">
-      <li><a href="https://github.com/adalinxx/lattice-node">lattice-node</a> — full node (RPC, gossip, sync, mempool, persistence) + CPU miner (lattice-miner)</li>
-      <li><a href="https://github.com/adalinxx/lattice-miner-gpu">lattice-miner-gpu</a> — GPU proof-of-work miner (auto-detects CUDA / Metal / OpenCL)</li>
-      <li><a href="https://github.com/adalinxx/Lattice">Lattice</a> — consensus (Hierarchical GHOST)</li>
-      <li><a href="https://github.com/adalinxx/Ivy">Ivy</a> — peer-to-peer networking</li>
-      <li><a href="https://github.com/adalinxx/VolumeBroker">VolumeBroker</a> — content-addressed storage</li>
-      <li><a href="https://github.com/adalinxx/cashew">cashew</a> — content-addressed store (CAS)</li>
-      <li><a href="https://github.com/adalinxx/Tally">Tally</a> — peer reputation</li>
-    </ul>
+  <section id="network">
+    <h2>Network</h2>
+    <p>Live height and peers read directly from the public seed nodes, refreshed every 15&nbsp;seconds. The numbers are whatever the nodes report right now. Testnet faucet: <a href="https://lattice-testnet-faucet.fly.dev">lattice-testnet-faucet.fly.dev</a>.</p>
+    <table>
+      <thead><tr><th>Network</th><th>Region</th><th class="num">Height</th><th class="num">Peers</th><th>Status</th></tr></thead>
+      <tbody id="net-rows"></tbody>
+    </table>
   </section>
 
 </main>
 
   <footer>
     <span class="wordmark">LATTICE</span>
+    <span class="links">
+      <a href="https://github.com/adalinxx">Code</a>
+    </span>
   </footer>
+
+<script>
+  const NETWORKS = {
+    Mainnet: [
+      ["iad", "https://lattice-mainnet-iad.fly.dev"],
+      ["ams", "https://lattice-mainnet-ams.fly.dev"],
+      ["sjc", "https://lattice-mainnet-sjc.fly.dev"]
+    ],
+    Testnet: [
+      ["iad", "https://lattice-testnet-iad.fly.dev"],
+      ["ams", "https://lattice-testnet-ams.fly.dev"],
+      ["sjc", "https://lattice-testnet-sjc.fly.dev"]
+    ]
+  };
+
+  const rows = [];
+  for (const [net, nodes] of Object.entries(NETWORKS))
+    nodes.forEach(([region, url]) => rows.push({ net, region, url }));
+
+  const tbody = document.getElementById("net-rows");
+  tbody.innerHTML = rows.map((r, i) => `
+    <tr id="net-${i}">
+      <td>${r.net}</td>
+      <td><a href="${r.url}/health">${r.region}</a></td>
+      <td class="num" data-cell="height">…</td>
+      <td class="num" data-cell="peers">…</td>
+      <td data-cell="status"><span class="dot"></span>…</td>
+    </tr>`).join("");
+
+  async function poll() {
+    await Promise.all(rows.map(async (r, i) => {
+      const tr = document.getElementById(`net-${i}`);
+      const cell = (k) => tr.querySelector(`[data-cell="${k}"]`);
+      try {
+        const res = await fetch(r.url + "/health", { cache: "no-store" });
+        const d = await res.json();
+        tr.classList.remove("down");
+        cell("height").textContent = (d.chainHeight ?? "—").toLocaleString();
+        cell("peers").textContent = d.peerCount ?? "—";
+        cell("status").innerHTML = `<span class="dot"></span>${d.status ?? "—"}`;
+      } catch (e) {
+        tr.classList.add("down");
+        cell("height").textContent = "—";
+        cell("peers").textContent = "—";
+        cell("status").innerHTML = `<span class="dot"></span>unreachable`;
+      }
+    }));
+  }
+
+  poll();
+  setInterval(poll, 15000);
+</script>
 
 </body>
 </html>
