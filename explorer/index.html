@@ -6,7 +6,7 @@
   <title>Nexus — Explorer</title>
   <meta name="description" content="Trustless, client-side block explorer for Nexus, the root chain of the Lattice network. One proof. Every chain." />
   <link rel="icon" href="assets/lattice-mark.svg" />
-  <link rel="stylesheet" href="assets/tokens.css?v=2" />
+  <link rel="stylesheet" href="assets/tokens.css?v=3" />
   <link rel="stylesheet" href="assets/style.css?v=2" />
 </head>
 <body>
@@ -18,7 +18,7 @@
         <span class="brand-sub">EXPLORER</span>
       </a>
       <form class="search" id="search-form" autocomplete="off">
-        <input id="search-input" type="text" placeholder="height / hash / cid / address" spellcheck="false" />
+        <input id="search-input" type="text" placeholder="height / hash / cid / address" aria-label="Search by height, hash, CID, or address" spellcheck="false" />
         <button type="submit">Find</button>
       </form>
       <select id="chain-select" aria-label="Chain"></select>
@@ -32,8 +32,9 @@
   <footer class="footer wrap">
     <span class="meta">one proof. every chain. — your browser talks to the node directly.</span>
     <nav class="meta">
+      <a href="../">lattice</a>
       <a id="node-link" href="#" target="_blank" rel="noopener">node</a>
-      <a href="https://github.com/adalinxx/nexus-explorer" target="_blank" rel="noopener">source</a>
+      <a href="https://github.com/adalinxx/lattice-home" target="_blank" rel="noopener">source</a>
     </nav>
   </footer>
 

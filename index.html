@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lattice - Launch your own blockchain</title>
+<title>Lattice — Launch your own blockchain</title>
 <meta name="description" content="Lattice is a toolkit for launching your own sovereign blockchain, secured from day one by a shared merged proof of work.">
 <link rel="icon" href="./lattice-mark.svg">
 <!-- Styles are inlined so this self-contained page paints in one request,
@@ -50,6 +50,7 @@ button, .btn { font: inherit; text-transform: uppercase; letter-spacing: var(--t
   border-radius: var(--radius); padding: var(--s-2) var(--s-3); cursor: pointer; }
 .btn--primary { background: var(--ink); color: var(--paper); }
 .btn:hover { background: var(--ink); color: var(--paper); }
+.btn--primary:hover { background: var(--paper); color: var(--ink); border-color: var(--ink); }
 input, textarea, select { font: inherit; color: var(--ink); background: transparent;
   border: 0; border-bottom: var(--rule); border-radius: 0; padding: var(--s-2) 0; }
 table { border-collapse: collapse; width: 100%; }
@@ -98,8 +99,11 @@ figure.term pre code { border: 0; padding: 0; font-size: inherit; color: inherit
   #network table { font-size: var(--fs-14); margin-top: var(--s-3); }
   #network td a { text-decoration: none; }
   #network tr.down td { opacity: .45; }
-  #network .dot { display: inline-block; width: .55em; height: .55em; border-radius: 50%;
-    background: currentColor; margin-right: .4em; vertical-align: baseline; }
+  /* status glyph: hollow square = nominal, ink-filled = down (matches the explorer;
+     monochrome, radius 0 — nothing is ever drawn) */
+  #network .dot { display: inline-block; width: 8px; height: 8px; border: var(--rule);
+    margin-right: var(--s-1); vertical-align: baseline; }
+  #network .dot.down { background: var(--ink); border-color: var(--ink); }
   @media (max-width: 640px) { .claims { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -115,7 +119,7 @@ figure.term pre code { border: 0; padding: 0; font-size: inherit; color: inherit
 <main>
 
   <div class="hero lattice-bg">
-    <span class="wordmark">LATTICE</span>
+    <h1 class="wordmark">LATTICE</h1>
     <p>Launch your own blockchain.</p>
     <div class="actions">
       <a class="btn btn--primary" href="#quickstart">Run a node</a>
@@ -264,7 +268,7 @@ curl -X POST http://localhost:8080/api/chain/deploy \
         tr.classList.add("down");
         cell("height").textContent = "—";
         cell("peers").textContent = "—";
-        cell("status").innerHTML = `<span class="dot"></span>unreachable`;
+        cell("status").innerHTML = `<span class="dot down"></span>unreachable`;
       }
     }));
   }
