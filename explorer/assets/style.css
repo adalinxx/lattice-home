@@ -64,6 +64,16 @@ tbody tr:hover td { background: var(--line); }
 .pill.bad, .pill--invert { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 
 .mono { font-family: var(--font); }
+
+/* ---- hashes: the full string lives in the DOM (copy/select gets it all);
+   CSS middle-truncates only when space actually runs out — head shrinks with
+   an ellipsis, the significant tail chars stay pinned ---- */
+.hash { display: inline-flex; max-width: 100%; white-space: nowrap; }
+.hash .head { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.hash .tail { flex: none; }
+/* the hash column absorbs the table's spare width, so a hash only truncates
+   when the table is genuinely tight (max-width:0 gives overflow a boundary) */
+.table-wrap td.shrink { width: 100%; max-width: 0; }
 .delta { font-variant-numeric: tabular-nums; }
 .crumbs { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: var(--track-display); margin-bottom: var(--s-3); }
 button.more { margin-top: var(--s-3); }
