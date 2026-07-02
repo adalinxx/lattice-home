@@ -211,7 +211,7 @@ curl -X POST http://localhost:8080/api/chain/deploy \
     <h2>Network</h2>
     <p>Live height and peers read directly from the public seed nodes, refreshed every 15&nbsp;seconds. The numbers are whatever the nodes report right now. Browse Nexus blocks and transactions in the <a href="./explorer/">block explorer</a>.</p>
     <table>
-      <thead><tr><th>Network</th><th>Region</th><th class="num">Height</th><th class="num">Peers</th><th>Status</th></tr></thead>
+      <thead><tr><th>Chain</th><th>Region</th><th class="num">Height</th><th class="num">Peers</th><th>Status</th></tr></thead>
       <tbody id="net-rows"></tbody>
     </table>
   </section>
@@ -226,8 +226,8 @@ curl -X POST http://localhost:8080/api/chain/deploy \
   </footer>
 
 <script>
-  const NETWORKS = {
-    Mainnet: [
+  const CHAINS = {
+    Nexus: [
       ["iad", "https://lattice-mainnet-iad.fly.dev"],
       ["ams", "https://lattice-mainnet-ams.fly.dev"],
       ["sjc", "https://lattice-mainnet-sjc.fly.dev"]
@@ -235,13 +235,13 @@ curl -X POST http://localhost:8080/api/chain/deploy \
   };
 
   const rows = [];
-  for (const [net, nodes] of Object.entries(NETWORKS))
-    nodes.forEach(([region, url]) => rows.push({ net, region, url }));
+  for (const [chain, nodes] of Object.entries(CHAINS))
+    nodes.forEach(([region, url]) => rows.push({ chain, region, url }));
 
   const tbody = document.getElementById("net-rows");
   tbody.innerHTML = rows.map((r, i) => `
     <tr id="net-${i}">
-      <td>${r.net}</td>
+      <td>${r.chain}</td>
       <td><a href="${r.url}/health">${r.region}</a></td>
       <td class="num" data-cell="height">…</td>
       <td class="num" data-cell="peers">…</td>
