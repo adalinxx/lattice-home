@@ -34,13 +34,21 @@ function buildUrl(base, path, params) {
   return url;
 }
 
-// One fetch against an explicit base; throws on !ok (status attached). No failover.
-async function rawFetch(base, path, params) {
-  const res = await fetch(buildUrl(base, path, params), { headers: { Accept: "application/json" } });
-  const text = await res.text();
-  let body; try { body = text ? JSON.parse(text) : {}; } catch { body = { error: text }; }
-  if (res.ok) return body;
-  const e = new Error(body && body.error ? body.error : `HTTP ${res.status}`); e.status = res.status; throw e;
+// Attacker-controlled child endpoints (from the rendezvous) are fetched as untrusted origins.
+// Only ever talk to an http(s) URL, and never hang on a blackholed host.
+function isHttpUrl(u) { try { const p = new URL(u).protocol; return p === "https:" || p === "http:"; } catch { return false; } }
+
+// One fetch against an explicit base; throws on !ok (status attached) or timeout. No failover.
+async function rawFetch(base, path, params, timeoutMs = 8000) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const res = await fetch(buildUrl(base, path, params), { headers: { Accept: "application/json" }, signal: ctl.signal });
+    const text = await res.text();
+    let body; try { body = text ? JSON.parse(text) : {}; } catch { body = { error: text }; }
+    if (res.ok) return body;
+    const e = new Error(body && body.error ? body.error : `HTTP ${res.status}`); e.status = res.status; throw e;
+  } finally { clearTimeout(t); }
 }
 
 // Backbone (root Nexus) request with dead-node/5xx failover. Params passed as-is.
@@ -178,17 +186,22 @@ function classifyTip(latest, spec) {
   return { status: age <= fresh ? "live" : "stale", height: latest.height };
 }
 
+const MAX_ENDPOINT_CANDIDATES = 5; // rendezvous list is attacker-controlled; probe only a few
+
 // A directly-served child node (from GET /api/chain/endpoints on the parent) is TRUSTED only
-// after its served genesis matches the anchor recorded in the parent's genesisState.
+// on a POSITIVE genesis match against the parent's anchor. Missing anchor or missing/omitted
+// served genesisHash → NOT trusted (an attacker who controls the endpoint could otherwise omit
+// genesisHash to bypass the check). Non-http(s) URLs are never dialed.
 async function verifiedChildEndpoint(childPath, anchorHash) {
+  if (!anchorHash) return null; // can't verify without the anchor → treat as unreachable
   let list;
   try { list = (await api("/api/chain/endpoints", { chainPath: childPath })).endpoints || []; }
   catch { return null; }
-  for (const e of list) {
+  for (const e of list.slice(0, MAX_ENDPOINT_CANDIDATES)) {
+    if (!e || !isHttpUrl(e.rpcUrl)) continue;
     try {
       const info = await rawFetch(e.rpcUrl, "/api/chain/info");
-      if (anchorHash && info.genesisHash && info.genesisHash !== anchorHash) continue; // impostor
-      return e.rpcUrl;
+      if (info.genesisHash === anchorHash) return e.rpcUrl; // positive match only
     } catch { /* dead / no CORS → next */ }
   }
   return null;
@@ -224,41 +237,46 @@ async function probeChain(chainPath, anchorHash) {
   return out;
 }
 
-// Resolve how to reach the CURRENT chain (state.chain): backbone proxy (endpoint=null) or a
-// directly-served child node. Sets state.chainEndpoint. Cached ~60s. Walks from root so a
-// deep chain resolves level-by-level, hopping node→node.
+// Resolve how to reach `chainPath`: null = backbone proxy (or offline — the view then shows
+// offline), a URL = a directly-served child node. PURE w.r.t. globals so a concurrent
+// navigation can't corrupt the walk. Cached ~60s. Walks from root level-by-level, hopping
+// node→node, and only hops on a POSITIVE genesis match (never trusts an unverifiable endpoint).
+const MAX_CHAIN_DEPTH = 8;
 const _access = new Map();
-async function ensureChainAccess() {
-  state.chainEndpoint = null;
-  if (!state.chain) return;
-  const c = _access.get(state.chain);
-  if (c && Date.now() - c.t < 60000) { state.chainEndpoint = c.ep; return; }
+async function resolveChainEndpoint(chainPath) {
+  if (!chainPath) return null;
+  const c = _access.get(chainPath);
+  if (c && Date.now() - c.t < 60000) return c.ep;
   let ep = null;
-  try { await backboneGet("/api/block/latest", { chainPath: state.chain }); } // proxy?
+  try { await backboneGet("/api/block/latest", { chainPath }); } // backbone can proxy it → no direct endpoint needed
   catch {
-    const parts = state.chain.split("/");
-    let base = null; // null = backbone
-    for (let i = 2; i <= parts.length; i++) {
-      const sub = parts.slice(0, i).join("/");
-      const parent = parts.slice(0, i - 1).join("/");
-      let anchor = null, list = [];
-      try {
-        const kids = (await getFrom(base, "/api/chain/children", { chainPath: parent })).children || [];
-        anchor = (kids.find((k) => k.chainPath.join("/") === sub) || {}).genesisHash;
-        list = (await getFrom(base, "/api/chain/endpoints", { chainPath: sub })).endpoints || [];
-      } catch { base = null; break; }
-      let hop = null;
-      for (const e of list) {
-        try { const info = await rawFetch(e.rpcUrl, "/api/chain/info");
-          if (!anchor || !info.genesisHash || info.genesisHash === anchor) { hop = e.rpcUrl; break; } } catch {}
+    const parts = chainPath.split("/");
+    if (parts.length <= MAX_CHAIN_DEPTH) {
+      let base = null; // null = backbone
+      for (let i = 2; i <= parts.length; i++) {
+        const sub = parts.slice(0, i).join("/");
+        const parent = parts.slice(0, i - 1).join("/");
+        let anchor = null, list = [];
+        try {
+          const kids = (await getFrom(base, "/api/chain/children", { chainPath: parent })).children || [];
+          anchor = (kids.find((k) => k.chainPath.join("/") === sub) || {}).genesisHash;
+          list = (await getFrom(base, "/api/chain/endpoints", { chainPath: sub })).endpoints || [];
+        } catch { base = null; break; }
+        if (!anchor) { base = null; break; } // no anchor → can't verify this level → give up
+        let hop = null;
+        for (const e of list.slice(0, MAX_ENDPOINT_CANDIDATES)) {
+          if (!e || !isHttpUrl(e.rpcUrl)) continue;
+          try { const info = await rawFetch(e.rpcUrl, "/api/chain/info");
+            if (info.genesisHash === anchor) { hop = e.rpcUrl; break; } } catch {} // positive match only
+        }
+        if (!hop) { base = null; break; }
+        base = hop;
       }
-      if (!hop) { base = null; break; }
-      base = hop;
+      ep = base;
     }
-    ep = base;
   }
-  state.chainEndpoint = ep;
-  _access.set(state.chain, { ep, t: Date.now() });
+  _access.set(chainPath, { ep, t: Date.now() });
+  return ep;
 }
 const getFrom = (base, path, params) => (base ? rawFetch(base, path, params) : backboneGet(path, params));
 
@@ -343,6 +361,7 @@ function renderOfflineChain(chainPath) {
 /* ----------------------------- views ----------------------------- */
 
 async function viewHome() {
+  const nav = _nav; // bail before painting if a newer navigation supersedes us
   setView(spinner());
   let latest;
   try {
@@ -404,6 +423,7 @@ async function viewHome() {
   root.appendChild(table);
   const chainsHost = el("div", { class: "chains" });
   root.appendChild(chainsHost);
+  if (nav !== _nav) return; // superseded → don't clobber the newer view
   setView(root);
   chainsSection(chainsHost);
 
@@ -705,16 +725,22 @@ async function resolveSearch(q) {
 
 /* ----------------------------- router ---------------------------- */
 
+let _nav = 0;
 async function router() {
+  const myNav = ++_nav; // supersede in-flight navigations
   let hash = location.hash.replace(/^#/, "") || "/";
-  // Chain context rides along as ?c=<chainPath> on any route; strip it and scope api().
+  // Chain context rides along as ?c=<chainPath> on any route.
   let query = "";
   const qi = hash.indexOf("?");
   if (qi >= 0) { query = hash.slice(qi + 1); hash = hash.slice(0, qi); }
-  state.chain = new URLSearchParams(query).get("c") || null;
-  // Resolve how to reach the current chain (backbone proxy vs a directly-served child node
-  // via the rendezvous) before any view fetches, so all api() calls route correctly.
-  await ensureChainAccess();
+  const chain = new URLSearchParams(query).get("c") || null;
+  // Resolve how to reach this chain (backbone proxy vs a directly-served child node via the
+  // rendezvous) BEFORE touching globals, then apply atomically — so a faster later navigation
+  // can't have its scope corrupted by this one's multi-round-trip resolution.
+  const endpoint = await resolveChainEndpoint(chain);
+  if (myNav !== _nav) return; // a newer navigation started while we resolved → drop this one
+  state.chain = chain;
+  state.chainEndpoint = endpoint;
   const parts = hash.split("/").filter(Boolean); // e.g. ["block","123"]
   if (parts.length === 0) return viewHome();
   const [route, ...rest] = parts;
