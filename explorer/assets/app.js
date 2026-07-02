@@ -21,8 +21,7 @@ function rotateNode() {
 }
 
 const state = {
-  chain: sessionStorage.getItem("chain") || null, // slash-joined chain path; null = node default (Nexus)
-  chains: [],
+  chain: null, // always the node default chain (Nexus) — this explorer is Nexus-only
 };
 
 /* ---------------------------- HTTP ------------------------------- */
@@ -124,32 +123,6 @@ function kvRows(pairs) {
         el("div", { class: "row" }, el("div", { class: "key" }, k), el("div", { class: "val" }, v == null ? "—" : v))
       )
   );
-}
-
-/* ------------------------- chain selector ------------------------ */
-
-async function loadChains() {
-  const sel = $("#chain-select");
-  try {
-    const info = await api("/api/chain/info");
-    state.chains = info.chains || [];
-    sel.innerHTML = "";
-    for (const c of state.chains) {
-      const path = (c.chainPath || [c.directory]).join("/");
-      sel.appendChild(el("option", { value: path }, path));
-    }
-    if (!state.chain && state.chains.length) state.chain = (state.chains[0].chainPath || [state.chains[0].directory]).join("/");
-    if (state.chain) sel.value = state.chain;
-  } catch {
-    sel.innerHTML = "";
-    sel.appendChild(el("option", {}, "Nexus"));
-  }
-  sel.onchange = () => {
-    state.chain = sel.value;
-    sessionStorage.setItem("chain", state.chain);
-    refreshNetStatus();
-    router();
-  };
 }
 
 /* ----------------------- network status bar ---------------------- */
@@ -558,7 +531,6 @@ async function boot() {
     e.preventDefault();
     resolveSearch($("#search-input").value);
   });
-  await loadChains();
   refreshNetStatus();
   netTimer = setInterval(refreshNetStatus, CFG.pollMs);
   window.addEventListener("hashchange", router);
