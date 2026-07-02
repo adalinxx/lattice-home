@@ -84,8 +84,15 @@ const el = (tag, attrs = {}, ...kids) => {
 };
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const short = (s, head = 10, tail = 8) =>
-  !s ? "" : s.length <= head + tail + 1 ? s : `${s.slice(0, head)}…${s.slice(-tail)}`;
+// Full hash in the DOM; CSS middle-truncates only on overflow (.hash in style.css).
+// The tail stays pinned so the significant end chars survive truncation.
+const hashEl = (s, tail = 8) =>
+  !s ? "" : el(
+    "span",
+    { class: "hash" },
+    s.length > tail ? el("span", { class: "head" }, s.slice(0, -tail)) : null,
+    el("span", { class: "tail" }, s.slice(-tail))
+  );
 const num = (n) => (n == null ? "—" : Number(n).toLocaleString());
 const fmtTime = (ms) => (ms == null ? "—" : new Date(Number(ms)).toLocaleString());
 const ago = (ms) => {
@@ -98,8 +105,8 @@ const ago = (ms) => {
 };
 const link = (href, text, cls) => el("a", { href, class: cls }, text);
 const blockLink = (id, text) => link(`#/block/${encodeURIComponent(id)}`, text || id, "mono");
-const txLink = (cid, text) => link(`#/tx/${encodeURIComponent(cid)}`, text || short(cid), "mono");
-const addrLink = (a, text) => link(`#/address/${encodeURIComponent(a)}`, text || short(a), "mono");
+const txLink = (cid, text) => link(`#/tx/${encodeURIComponent(cid)}`, text || hashEl(cid), "mono");
+const addrLink = (a, text) => link(`#/address/${encodeURIComponent(a)}`, text || hashEl(a), "mono");
 
 function setView(node) {
   const v = $("#view");
@@ -143,7 +150,7 @@ async function refreshNetStatus() {
         el("span", {}, "Peers ", el("b", {}, num(h.peerCount))),
         mp ? el("span", {}, "Mempool ", el("b", {}, num(mp.count))) : null,
         el("span", {}, h.syncing ? el("span", { class: "pill dim" }, "syncing") : el("span", { class: "pill good" }, "synced")),
-        el("span", { class: "hide-sm" }, "Genesis ", el("b", { class: "mono", title: h.genesisHash }, short(h.genesisHash, 8, 6)))
+        el("span", { class: "hide-sm" }, "Genesis ", el("b", { class: "mono" }, hashEl(h.genesisHash, 6)))
       )
     );
   } catch {
@@ -178,7 +185,7 @@ async function viewHome() {
     api("/api/peers").catch(() => null),
   ]);
   cards.appendChild(card("Tip height", num(tipHeight)));
-  cards.appendChild(card("Latest block", blockLink(latest.hash, short(latest.hash, 8, 6)), true));
+  cards.appendChild(card("Latest block", blockLink(latest.hash, hashEl(latest.hash, 6)), true));
   if (mp) cards.appendChild(card("Mempool txs", num(mp.count)));
   if (peers) cards.appendChild(card("Peers", num(peers.count)));
   if (spec) {
@@ -234,7 +241,7 @@ function blockRow(b) {
     "tr",
     { "data-height": b.height },
     el("td", {}, blockLink(b.height, "#" + num(b.height))),
-    el("td", {}, blockLink(b.hash, short(b.hash, 12, 8))),
+    el("td", { class: "shrink" }, blockLink(b.hash, hashEl(b.hash))),
     el("td", { class: "num" }, num(b.transactionCount ?? 0)),
     el("td", { class: "hide-sm num" }, ago(b.timestamp))
   );
@@ -263,8 +270,8 @@ async function viewBlock(id) {
       ["Child blocks", num(b.childBlockCount)],
       ["Nonce", num(b.nonce)],
       ["Version", b.version],
-      ["Target", el("span", { class: "mono", title: b.target }, short(b.target, 12, 10))],
-      ["Next target", el("span", { class: "mono", title: b.nextTarget }, short(b.nextTarget, 12, 10))],
+      ["Target", el("span", { class: "mono" }, hashEl(b.target, 10))],
+      ["Next target", el("span", { class: "mono" }, hashEl(b.nextTarget, 10))],
       ["Transactions CID", el("code", { class: "cid" }, b.transactionsCID)],
       ["Post-state CID", el("code", { class: "cid" }, b.postStateCID)],
       ["Chain", b.chain],
@@ -313,8 +320,8 @@ async function loadBlockTxs(hash, holder, offset) {
         el(
           "tr",
           {},
-          el("td", {}, txLink(t.txCID)),
-          el("td", {}, t.signers && t.signers.length ? addrLink(t.signers[0]) : el("span", { class: "pill dim" }, "—")),
+          el("td", { class: "shrink" }, txLink(t.txCID)),
+          el("td", { class: "shrink" }, t.signers && t.signers.length ? addrLink(t.signers[0]) : el("span", { class: "pill dim" }, "—")),
           el("td", { class: "num" }, num(t.fee)),
           el("td", { class: "num hide-sm" }, num(actions))
         )
@@ -340,7 +347,7 @@ async function loadBlockChildren(hash, holder) {
           "tr",
           {},
           el("td", {}, c.directory),
-          el("td", {}, el("span", { class: "mono", title: c.blockHash }, short(c.blockHash, 12, 8))),
+          el("td", { class: "shrink" }, el("span", { class: "mono" }, hashEl(c.blockHash))),
           el("td", { class: "num" }, num(c.height)),
           el("td", { class: "num hide-sm" }, num(c.transactionCount))
         )
@@ -452,9 +459,9 @@ async function viewAddress(addr) {
         el(
           "tr",
           {},
-          el("td", {}, txLink(t.txCID)),
+          el("td", { class: "shrink" }, txLink(t.txCID)),
           el("td", {}, blockLink(t.height, "#" + num(t.height))),
-          el("td", { class: "mono hide-sm" }, short(t.blockHash, 10, 6))
+          el("td", { class: "mono hide-sm shrink" }, hashEl(t.blockHash, 6))
         )
       );
     }
