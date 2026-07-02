@@ -16,12 +16,13 @@ House line: **One proof. Every chain.**
 
 ## Files
 
-- `index.html` — the whole site, one page.
-- `tokens.css` — vendored design tokens (zero-accent). Source of truth: `lattice-design`.
-- `lattice-mark.svg` — the mark (favicon + nav lockup).
+- `index.html` — the whole site, one page. Design tokens (zero-accent; source of truth: `lattice-design`) are inlined so it paints in a single request. A small inline script feeds the live Network table from the public seed nodes.
+- `explorer/` — the Nexus block explorer, vendored in (client-side, talks to the nodes directly). Served at `/explorer/`.
+- `lattice-mark.svg` — the mark (favicon).
+- `.nojekyll` — so GitHub Pages serves the explorer assets raw.
 
-No build step, no JavaScript, no web fonts, no images. Open `index.html` directly, or serve the folder statically.
+No build step, no web fonts, no images. The only JavaScript is the Network status poll and the explorer app — both client-side, no backend. Open `index.html` directly, or serve the folder statically.
 
 ## Deliberately omitted
 
-No token/price/roadmap-hype, team grid, partner logos, illustrations, or animation — each fights the design system. A `/status` page (live height, peers, active chains) is the only planned addition, and only once the network is live and the numbers are real.
+No token/price/roadmap-hype, team grid, partner logos, illustrations, or animation — each fights the design system.
