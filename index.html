@@ -153,8 +153,9 @@ figure.term pre code { border: 0; padding: 0; font-size: inherit; color: inherit
 cd lattice-node
 swift build -c release
 
-# Join the network. --min-peer-key-bits 16 is required to peer with the seeds.
-.build/release/node --autosize --rpc-port 8080 --min-peer-key-bits 16
+# Join the network. Built-in seeds and the default --min-peer-key-bits (16) let a bare
+# node discover peers and sync on its own — no --peer or key-bits flag to set.
+.build/release/LatticeNode --autosize --rpc-port 8080
 
 # In another shell, confirm it's up and syncing:
 curl http://localhost:8080/api/chain/info</code></pre>
@@ -194,7 +195,7 @@ curl -X POST http://localhost:8080/api/chain/deploy \
     "wasmPolicies": []
   }'</code></pre>
 </figure>
-    <p>Deploy seeds the chain locally and returns its genesis. It becomes discoverable to every node once a <strong>genesis-action transaction</strong> for it lands in the parent chain — an ordinary mempool transaction any miner can include, so it isn't tied to your node winning a block and survives your node going offline. The parent records only the opaque <code>{directory, genesis-CID}</code> anchor; it never judges the child's contents.</p>
+    <p>Deploy defines the chain and returns its genesis — but the child runs as its <strong>own process</strong> that subscribes to the parent for blocks, not inside this node. Spawn it with the returned <code>genesisHex</code> (<code>--genesis-hex --chain-directory --subscribe-p2p --peer</code>), register its RPC, then point a miner at it with <code>--child-node</code> to merge-mine parent and child in one search — see the <a href="https://github.com/adalinxx/lattice-node/blob/main/deploy/README.md">per-process child-chain runbook</a>. It becomes discoverable to every node once a <strong>genesis-action transaction</strong> for it lands in the parent chain — an ordinary mempool transaction any miner can include, so it isn't tied to your node winning a block and survives your node going offline. The parent records only the opaque <code>{directory, genesis-CID}</code> anchor; it never judges the child's contents.</p>
     <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/rpc-api.md">RPC API</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/protocol.md">Protocol</a></p>
   </section>
 
