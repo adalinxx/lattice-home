@@ -3,7 +3,7 @@
 window.LATTICE_CONFIG = {
   // Live Nexus mainnet nodes (same chain/genesis), tried in order. Requests
   // fail over to the next on a dead node or a 5xx. CORS on each allows
-  // https://adalinxx.github.io.
+  // https://lattice.build.
   nodeUrls: [
     "https://lattice-mainnet-iad.fly.dev",
     "https://lattice-mainnet-ams.fly.dev",
