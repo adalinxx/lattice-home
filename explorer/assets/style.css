@@ -17,23 +17,23 @@
 .search input { flex: 1; min-width: 0; }
 .search button { white-space: nowrap; }
 
-/* ---- network status strip ---- */
-.net-status { border-bottom: var(--rule); }
-.net-status .wrap { display: flex; flex-wrap: wrap; gap: var(--s-4); align-items: center;
-  padding: var(--s-2) var(--s-4); font-size: var(--fs-12); text-transform: uppercase; letter-spacing: 0.04em; }
-.net-status b { font-weight: 600; text-transform: none; letter-spacing: 0; font-size: var(--fs-14); }
-
-/* status glyph: hollow square = nominal, ink-filled = alert (monochrome, no color) */
-.dot { display: inline-block; width: 8px; height: 8px; border: var(--rule); margin-right: var(--s-1); vertical-align: baseline; }
-.dot.degraded, .dot.unhealthy, .dot.down { background: var(--ink); border-color: var(--ink); }
-
 /* ---- main ---- */
 main { padding: var(--s-5) var(--s-4) var(--s-6); }
 .sub { font-size: var(--fs-14); margin: calc(-1 * var(--s-2)) 0 var(--s-5); }
 /* chain address bar — type a chain path and navigate to its explorer */
-.chainbar { display: flex; align-items: flex-end; gap: var(--s-3); margin: calc(-1 * var(--s-2)) 0 var(--s-5); max-width: 32rem; }
+.chainbar { display: flex; align-items: flex-end; gap: var(--s-3); margin: calc(-1 * var(--s-2)) 0 var(--s-5); max-width: 34rem; }
+.chainbar-label { align-self: center; font-size: var(--fs-12); text-transform: uppercase; letter-spacing: var(--track-display); white-space: nowrap; }
 .chainbar input { flex: 1; min-width: 0; }
 .chainbar button { white-space: nowrap; }
+
+/* loading skeleton — hairline placeholders that pulse (matches the layout the data fills) */
+.sk { background: var(--line); animation: skpulse 1.2s ease-in-out infinite; }
+.sk-h1 { height: var(--fs-28); width: 15rem; max-width: 60%; margin-bottom: var(--s-5); }
+.sk-k { height: var(--fs-12); width: 55%; }
+.sk-v { height: var(--fs-20); width: 75%; margin-top: var(--s-2); }
+.sk-row { height: var(--fs-16); width: 100%; }
+@keyframes skpulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
 h1 { font-size: var(--fs-28); }
 h2 { font-size: var(--fs-20); margin: var(--s-5) 0 var(--s-3); }
 
