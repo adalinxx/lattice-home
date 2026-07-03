@@ -22,8 +22,10 @@ function rotateNode() {
 
 const state = {
   chain: null,         // current chainPath ("Nexus/Mid/…"); null = root (Nexus). From the ?c= hash suffix.
-  chainEndpoint: null, // when set, the current chain is served DIRECTLY by this child node URL
-                       // (discovered + genesis-verified via the rendezvous); no chainPath scoping.
+  chainEndpoint: null, // when set, the current chain is served DIRECTLY by this node URL
+                       // (discovered + genesis-verified via the rendezvous or config).
+  chainEndpointPath: null, // if the endpoint serves this chain as a CHILD (a full node, not a
+                       // toy-only node), the chainPath to scope requests with; null = served at root.
 };
 
 /* ---------------------------- HTTP ------------------------------- */
@@ -71,7 +73,12 @@ async function backboneGet(path, params) {
 // resolved one, else the backbone proxy scoped by ?chainPath=. An explicit params.chainPath
 // (used by probes that target a specific child) always wins over the current chain.
 async function api(path, params) {
-  if (state.chainEndpoint) return rawFetch(state.chainEndpoint, path, params);
+  if (state.chainEndpoint) {
+    // A child-served endpoint (full node serving this chain as a child) needs chainPath scoping;
+    // a root-serving node (toy-only) does not.
+    const p = state.chainEndpointPath ? { ...(params || {}), chainPath: state.chainEndpointPath } : params;
+    return rawFetch(state.chainEndpoint, path, p);
+  }
   const p = { ...(params || {}) };
   if (state.chain && p.chainPath == null) p.chainPath = state.chain;
   return backboneGet(path, p);
@@ -194,6 +201,15 @@ const MAX_ENDPOINT_CANDIDATES = 5; // rendezvous list is attacker-controlled; pr
 // genesisHash to bypass the check). Non-http(s) URLs are never dialed.
 async function verifiedChildEndpoint(childPath, anchorHash) {
   if (!anchorHash) return null; // can't verify without the anchor → treat as unreachable
+  // Known child-serving endpoint (config): a full node serving this chain as a child. Verify its
+  // served genesis (queried WITH chainPath) matches the anchor.
+  const known = (window.LATTICE_CONFIG.childEndpoints || {})[childPath];
+  if (known && isHttpUrl(known)) {
+    try {
+      const g = await rawFetch(known, "/api/chain/genesis", { chainPath: childPath });
+      if (g.genesisHash === anchorHash) return known;
+    } catch { /* dead / no CORS → fall through */ }
+  }
   let list;
   try { list = (await api("/api/chain/endpoints", { chainPath: childPath })).endpoints || []; }
   catch { return null; }
@@ -244,9 +260,27 @@ async function probeChain(chainPath, anchorHash) {
 const MAX_CHAIN_DEPTH = 8;
 const _access = new Map();
 async function resolveChainEndpoint(chainPath) {
-  if (!chainPath) return null;
+  if (!chainPath) return { ep: null, path: null };
   const c = _access.get(chainPath);
-  if (c && Date.now() - c.t < 60000) return c.ep;
+  if (c && Date.now() - c.t < 60000) return c.val;
+
+  // Known child-serving endpoint (config): a full node serving this chain as a CHILD (queried
+  // with chainPath). Verify the served genesis matches the parent's on-chain anchor before use.
+  const known = (window.LATTICE_CONFIG.childEndpoints || {})[chainPath];
+  if (known && isHttpUrl(known)) {
+    try {
+      const parent = chainPath.split("/").slice(0, -1).join("/");
+      const kids = (await backboneGet("/api/chain/children", { chainPath: parent })).children || [];
+      const anchor = (kids.find((k) => k.chainPath.join("/") === chainPath) || {}).genesisHash;
+      const g = anchor ? await rawFetch(known, "/api/chain/genesis", { chainPath }) : null;
+      if (g && g.genesisHash === anchor) {
+        const val = { ep: known, path: chainPath };
+        _access.set(chainPath, { val, t: Date.now() });
+        return val;
+      }
+    } catch { /* fall through to rendezvous */ }
+  }
+
   let ep = null;
   try { await backboneGet("/api/block/latest", { chainPath }); } // backbone can proxy it → no direct endpoint needed
   catch {
@@ -275,8 +309,9 @@ async function resolveChainEndpoint(chainPath) {
       ep = base;
     }
   }
-  _access.set(chainPath, { ep, t: Date.now() });
-  return ep;
+  const val = { ep, path: null }; // rendezvous/walk endpoints serve the chain at root
+  _access.set(chainPath, { val, t: Date.now() });
+  return val;
 }
 const getFrom = (base, path, params) => (base ? rawFetch(base, path, params) : backboneGet(path, params));
 
@@ -737,10 +772,11 @@ async function router() {
   // Resolve how to reach this chain (backbone proxy vs a directly-served child node via the
   // rendezvous) BEFORE touching globals, then apply atomically — so a faster later navigation
   // can't have its scope corrupted by this one's multi-round-trip resolution.
-  const endpoint = await resolveChainEndpoint(chain);
+  const resolved = await resolveChainEndpoint(chain);
   if (myNav !== _nav) return; // a newer navigation started while we resolved → drop this one
   state.chain = chain;
-  state.chainEndpoint = endpoint;
+  state.chainEndpoint = resolved.ep;
+  state.chainEndpointPath = resolved.path;
   const parts = hash.split("/").filter(Boolean); // e.g. ["block","123"]
   if (parts.length === 0) return viewHome();
   const [route, ...rest] = parts;
