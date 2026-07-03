@@ -345,6 +345,27 @@ function chainCrumbs(chainPath) {
   return crumbs;
 }
 
+// An address-bar-style input for jumping to any chain by path (e.g. "Nexus/toy").
+// Submitting navigates to that chain's explorer view; empty / "Nexus" goes to the root.
+function chainBar(currentPath) {
+  const input = el("input", {
+    type: "text",
+    value: currentPath || "Nexus",
+    placeholder: "chain path — e.g. Nexus/toy",
+    "aria-label": "Go to chain by path",
+    spellcheck: "false",
+    autocapitalize: "off",
+    autocorrect: "off",
+    autocomplete: "off",
+  });
+  const go = () => {
+    const v = input.value.trim().replace(/^\/+|\/+$/g, "");
+    location.hash = !v || v.toLowerCase() === "nexus" ? "#/" : `#/?c=${encodeURIComponent(v)}`;
+  };
+  return el("form", { class: "chainbar", onsubmit: (e) => { e.preventDefault(); go(); } },
+    input, el("button", { type: "submit" }, "Go"));
+}
+
 // List the current chain's direct children with live/stale/offline status.
 async function chainsSection(host) {
   host.appendChild(el("h2", {}, state.chain ? "Sub-chains" : "Child chains"));
@@ -411,7 +432,7 @@ async function viewHome() {
   const root = el("div");
   if (state.chain) root.appendChild(chainCrumbs(state.chain));
   root.appendChild(el("h1", {}, state.chain ? esc(state.chain.split("/").pop()) : "Network overview"));
-  root.appendChild(el("p", { class: "sub" }, `Chain: ${esc(state.chain || latest.chain || "Nexus")}`));
+  root.appendChild(chainBar(state.chain || latest.chain || "Nexus"));
 
   const cards = el("div", { class: "cards" });
   root.appendChild(cards);
