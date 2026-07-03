@@ -155,34 +155,6 @@ function kvRows(pairs) {
   );
 }
 
-/* ----------------------- network status bar ---------------------- */
-
-let netTimer = null;
-async function refreshNetStatus() {
-  const bar = $("#net-status");
-  try {
-    // Net-status is always about the node's root chain (Nexus), even while browsing a child.
-    const [h, mp] = await Promise.all([backboneGet("/health"), backboneGet("/api/mempool").catch(() => null)]);
-    const cls = h.status === "ok" ? "ok" : h.status === "degraded" ? "degraded" : "unhealthy";
-    bar.innerHTML = "";
-    bar.appendChild(
-      el(
-        "div",
-        { class: "wrap" },
-        el("span", {}, el("span", { class: `dot ${cls}` }), el("b", {}, h.status)),
-        el("span", {}, "Height ", el("b", { id: "ns-height" }, num(h.chainHeight))),
-        el("span", {}, "Peers ", el("b", {}, num(h.peerCount))),
-        mp ? el("span", {}, "Mempool ", el("b", {}, num(mp.count))) : null,
-        el("span", {}, h.syncing ? el("span", { class: "pill dim" }, "syncing") : el("span", { class: "pill good" }, "synced")),
-        el("span", { class: "hide-sm" }, "Genesis ", el("b", { class: "mono" }, hashEl(h.genesisHash, 6)))
-      )
-    );
-  } catch {
-    bar.innerHTML = "";
-    bar.appendChild(el("div", { class: "wrap" }, el("span", {}, el("span", { class: "dot down" }), el("b", {}, "node unreachable"))));
-  }
-}
-
 /* -------------------------- child chains ------------------------- */
 
 // live = served + current; stale = served but behind/syncing; offline = no reachable node.
@@ -363,7 +335,26 @@ function chainBar(currentPath) {
     location.hash = !v || v.toLowerCase() === "nexus" ? "#/" : `#/?c=${encodeURIComponent(v)}`;
   };
   return el("form", { class: "chainbar", onsubmit: (e) => { e.preventDefault(); go(); } },
+    el("span", { class: "chainbar-label" }, "Chain"),
     input, el("button", { type: "submit" }, "Go"));
+}
+
+// Loading skeleton for the overview: hairline placeholders in the shape the data fills,
+// so the first paint reads as structure rather than a bare "Loading…".
+function homeSkeleton() {
+  const root = el("div");
+  root.appendChild(el("div", { class: "sk sk-h1" }));
+  const cards = el("div", { class: "cards" });
+  for (let i = 0; i < 4; i++) {
+    cards.appendChild(el("div", { class: "card" }, el("div", { class: "sk sk-k" }), el("div", { class: "sk sk-v" })));
+  }
+  root.appendChild(cards);
+  const tbody = el("tbody");
+  for (let i = 0; i < 6; i++) {
+    tbody.appendChild(el("tr", {}, el("td", { colspan: 4 }, el("div", { class: "sk sk-row" }))));
+  }
+  root.appendChild(el("div", { class: "table-wrap" }, el("table", {}, tbody)));
+  return root;
 }
 
 // List the current chain's direct children with live/stale/offline status.
@@ -418,7 +409,7 @@ function renderOfflineChain(chainPath) {
 
 async function viewHome() {
   const nav = _nav; // bail before painting if a newer navigation supersedes us
-  setView(spinner());
+  setView(homeSkeleton());
   let latest;
   try {
     latest = await api("/api/block/latest");
@@ -430,8 +421,10 @@ async function viewHome() {
   const tipHeight = Number(latest.height ?? 0);
 
   const root = el("div");
+  // Location cues: breadcrumbs on a child chain, a dashboard title at the root — the address
+  // bar carries the current path either way, so we don't repeat the chain name as an H1.
   if (state.chain) root.appendChild(chainCrumbs(state.chain));
-  root.appendChild(el("h1", {}, state.chain ? esc(state.chain.split("/").pop()) : "Network overview"));
+  else root.appendChild(el("h1", {}, "Network overview"));
   root.appendChild(chainBar(state.chain || latest.chain || "Nexus"));
 
   const cards = el("div", { class: "cards" });
@@ -444,9 +437,9 @@ async function viewHome() {
     api("/api/peers").catch(() => null),
   ]);
   cards.appendChild(card("Tip height", num(tipHeight)));
-  cards.appendChild(card("Latest block", blockLink(latest.hash, hashEl(latest.hash, 6)), true));
   if (mp) cards.appendChild(card("Mempool txs", num(mp.count)));
-  if (peers) cards.appendChild(card("Peers", num(peers.count)));
+  // Peers is a node-level metric — only meaningful on the root view, not per child chain.
+  if (!state.chain && peers) cards.appendChild(card("Peers", num(peers.count)));
   if (spec) {
     cards.appendChild(card("Block time", `${(Number(spec.targetBlockTime) / 1000).toFixed(0)}s`));
     cards.appendChild(card("Block reward", num(spec.initialReward)));
@@ -816,8 +809,6 @@ async function boot() {
     e.preventDefault();
     resolveSearch($("#search-input").value);
   });
-  refreshNetStatus();
-  netTimer = setInterval(refreshNetStatus, CFG.pollMs);
   window.addEventListener("hashchange", router);
   router();
 }
