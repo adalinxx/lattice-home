@@ -339,6 +339,20 @@ function chainBar(currentPath) {
     input, el("button", { type: "submit" }, "Go"));
 }
 
+// Search the current chain by height / hash / cid / address. Rendered in-page (above the
+// blocks list) rather than in the header.
+function searchBar() {
+  const input = el("input", {
+    type: "text",
+    placeholder: "height / hash / cid / address",
+    "aria-label": "Search by height, hash, CID, or address",
+    spellcheck: "false",
+    autocomplete: "off",
+  });
+  return el("form", { class: "search", autocomplete: "off", onsubmit: (e) => { e.preventDefault(); resolveSearch(input.value); } },
+    input, el("button", { type: "submit" }, "Find"));
+}
+
 // Loading skeleton for the overview: hairline placeholders in the shape the data fills,
 // so the first paint reads as structure rather than a bare "Loading…".
 function homeSkeleton() {
@@ -445,7 +459,8 @@ async function viewHome() {
     cards.appendChild(card("Block reward", num(spec.initialReward)));
   }
 
-  // Recent blocks.
+  // Recent blocks, with in-page search above them.
+  root.appendChild(searchBar());
   root.appendChild(el("h2", {}, "Latest blocks"));
   const tbody = el("tbody");
   const table = el(
@@ -805,10 +820,6 @@ async function router() {
 
 async function boot() {
   $("#node-link").href = activeNode();
-  $("#search-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    resolveSearch($("#search-input").value);
-  });
   window.addEventListener("hashchange", router);
   router();
 }

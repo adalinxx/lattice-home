@@ -13,7 +13,8 @@
 .brand-sub { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: var(--track-display); }
 .brand:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
-.search { flex: 1; display: flex; align-items: flex-end; gap: var(--s-3); min-width: 0; }
+/* in-page search (above the blocks list) — full width, button pinned right */
+.search { display: flex; align-items: flex-end; gap: var(--s-3); margin: var(--s-5) 0 var(--s-3); }
 .search input { flex: 1; min-width: 0; }
 .search button { white-space: nowrap; }
 
@@ -92,8 +93,6 @@ code.cid { font-size: var(--fs-14); }
 .footer nav a + a::before { content: " / "; opacity: 0.5; }
 
 @media (max-width: 640px) {
-  .topbar .wrap { flex-wrap: wrap; padding-top: var(--s-2); padding-bottom: var(--s-2); }
-  .search { order: 3; flex-basis: 100%; }
   .kv .row { grid-template-columns: 1fr; }
   .kv .row .key { padding-bottom: 0; }
   .hide-sm { display: none; }
