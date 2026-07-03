@@ -21,12 +21,6 @@
 /* ---- main ---- */
 main { padding: var(--s-5) var(--s-4) var(--s-6); }
 .sub { font-size: var(--fs-14); margin: calc(-1 * var(--s-2)) 0 var(--s-5); }
-/* chain address bar — type a chain path and navigate to its explorer */
-.chainbar { display: flex; align-items: flex-end; gap: var(--s-3); margin: calc(-1 * var(--s-2)) 0 var(--s-5); max-width: 34rem; }
-.chainbar-label { align-self: center; font-size: var(--fs-12); text-transform: uppercase; letter-spacing: var(--track-display); white-space: nowrap; }
-.chainbar input { flex: 1; min-width: 0; }
-.chainbar button { white-space: nowrap; }
-
 /* loading skeleton — hairline placeholders that pulse (matches the layout the data fills) */
 .sk { background: var(--line); animation: skpulse 1.2s ease-in-out infinite; }
 .sk-h1 { height: var(--fs-28); width: 15rem; max-width: 60%; margin-bottom: var(--s-5); }

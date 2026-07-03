@@ -317,36 +317,15 @@ function chainCrumbs(chainPath) {
   return crumbs;
 }
 
-// An address-bar-style input for jumping to any chain by path (e.g. "Nexus/toy").
-// Submitting navigates to that chain's explorer view; empty / "Nexus" goes to the root.
-function chainBar(currentPath) {
-  const input = el("input", {
-    type: "text",
-    value: currentPath || "Nexus",
-    placeholder: "chain path — e.g. Nexus/toy",
-    "aria-label": "Go to chain by path",
-    spellcheck: "false",
-    autocapitalize: "off",
-    autocorrect: "off",
-    autocomplete: "off",
-  });
-  const go = () => {
-    const v = input.value.trim().replace(/^\/+|\/+$/g, "");
-    location.hash = !v || v.toLowerCase() === "nexus" ? "#/" : `#/?c=${encodeURIComponent(v)}`;
-  };
-  return el("form", { class: "chainbar", onsubmit: (e) => { e.preventDefault(); go(); } },
-    el("span", { class: "chainbar-label" }, "Chain"),
-    input, el("button", { type: "submit" }, "Go"));
-}
-
-// Search the current chain by height / hash / cid / address. Rendered in-page (above the
-// blocks list) rather than in the header.
+// Unified search + navigate, rendered above the blocks list: a chain path (e.g. Nexus/toy)
+// jumps to that chain; a height, block/tx hash, CID, or address resolves to that item.
 function searchBar() {
   const input = el("input", {
     type: "text",
-    placeholder: "height / hash / cid / address",
-    "aria-label": "Search by height, hash, CID, or address",
+    placeholder: "chain path / height / hash / address",
+    "aria-label": "Go to a chain path, or search a height, hash, CID, or address",
     spellcheck: "false",
+    autocapitalize: "off",
     autocomplete: "off",
   });
   return el("form", { class: "search", autocomplete: "off", onsubmit: (e) => { e.preventDefault(); resolveSearch(input.value); } },
@@ -435,11 +414,10 @@ async function viewHome() {
   const tipHeight = Number(latest.height ?? 0);
 
   const root = el("div");
-  // Location cues: breadcrumbs on a child chain, a dashboard title at the root — the address
-  // bar carries the current path either way, so we don't repeat the chain name as an H1.
+  // Location cue: breadcrumbs on a child chain, a dashboard title at the root. The search bar
+  // (below) also navigates to any chain by path, so the path isn't repeated up here.
   if (state.chain) root.appendChild(chainCrumbs(state.chain));
   else root.appendChild(el("h1", {}, "Network overview"));
-  root.appendChild(chainBar(state.chain || latest.chain || "Nexus"));
 
   const cards = el("div", { class: "cards" });
   root.appendChild(cards);
@@ -780,6 +758,12 @@ function startLiveBlocks(tbody) {
 async function resolveSearch(q) {
   q = q.trim();
   if (!q) return;
+  // A chain path (contains a slash, or the root name) navigates to that chain's explorer.
+  if (q.includes("/") || q.toLowerCase() === "nexus") {
+    const p = q.replace(/^\/+|\/+$/g, "");
+    location.hash = !p || p.toLowerCase() === "nexus" ? "#/" : `#/?c=${encodeURIComponent(p)}`;
+    return;
+  }
   if (/^\d+$/.test(q)) { location.hash = `#/block/${q}`; return; }
   // Try block hash, then tx CID, then treat as an address.
   try { await api(`/api/block/${encodeURIComponent(q)}`); location.hash = `#/block/${encodeURIComponent(q)}`; return; } catch (e) { if (e.status !== 404) {} }
