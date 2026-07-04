@@ -157,15 +157,11 @@ function kvRows(pairs) {
 
 /* -------------------------- child chains ------------------------- */
 
-// live = served + current; stale = served but behind/syncing; offline = no reachable node.
+// live = a node serves the tip; offline = no reachable node is serving it. We intentionally do
+// NOT judge "behind/stale" by tip age: a chain's block time is variable (bursty single-miner
+// chains especially), so an age threshold just produces confusing false "stale" flags.
 function classifyTip(latest, spec) {
-  const tbt = spec ? Number(spec.targetBlockTime) : 0;
-  // Tolerate difficulty oscillation on small single-miner chains: blocks can arrive well under
-  // target then a retarget overshoot leaves one multi-block-time gap. 6 block-times / 180s floor
-  // keeps an advancing-but-bursty chain "live" while still flagging a genuinely halted one.
-  const fresh = Math.max(tbt * 6, 180000);
-  const age = Date.now() - Number(latest.timestamp || 0);
-  return { status: age <= fresh ? "live" : "stale", height: latest.height };
+  return { status: "live", height: latest.height };
 }
 
 const MAX_ENDPOINT_CANDIDATES = 5; // rendezvous list is attacker-controlled; probe only a few
@@ -292,8 +288,7 @@ const getFrom = (base, path, params) => (base ? rawFetch(base, path, params) : b
 
 function statusBadge(status) {
   const S = {
-    live: ["#38d66b", "live", "served and current"],
-    stale: ["#e5b13a", "stale", "a node serves it, but it's behind the latest / still syncing"],
+    live: ["#38d66b", "live", "a node is serving this chain"],
     offline: ["#8a8f98", "offline", "anchored on its parent, but no reachable node is serving it now"],
     unknown: ["#8a8f98", "…", "checking…"],
   };
@@ -353,7 +348,7 @@ function homeSkeleton() {
   return root;
 }
 
-// List the current chain's direct children with live/stale/offline status.
+// List the current chain's direct children with live/offline status.
 async function chainsSection(host) {
   host.appendChild(el("h2", {}, state.chain ? "Sub-chains" : "Child chains"));
   const tbody = el("tbody");
