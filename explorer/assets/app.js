@@ -160,7 +160,10 @@ function kvRows(pairs) {
 // live = served + current; stale = served but behind/syncing; offline = no reachable node.
 function classifyTip(latest, spec) {
   const tbt = spec ? Number(spec.targetBlockTime) : 0;
-  const fresh = Math.max(tbt * 4, 120000); // tolerate quiet / long-block-time chains
+  // Tolerate difficulty oscillation on small single-miner chains: blocks can arrive well under
+  // target then a retarget overshoot leaves one multi-block-time gap. 6 block-times / 180s floor
+  // keeps an advancing-but-bursty chain "live" while still flagging a genuinely halted one.
+  const fresh = Math.max(tbt * 6, 180000);
   const age = Date.now() - Number(latest.timestamp || 0);
   return { status: age <= fresh ? "live" : "stale", height: latest.height };
 }
