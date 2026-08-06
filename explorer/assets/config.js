@@ -1,13 +1,14 @@
 // Runtime configuration for the explorer. Edit this file to point at a
 // different node — no build step required.
 window.LATTICE_CONFIG = {
-  // Live Nexus mainnet nodes (same chain/genesis), tried in order. Requests
-  // fail over to the next on a dead node or a 5xx. CORS on each allows
-  // https://lattice.build.
+  // Public read surface for Nexus mainnet, tried in order (requests fail over to
+  // the next on a dead node or a 5xx). These are read replicas: an nginx
+  // allowlist proxy in front of a full node's loopback RPC, exposing only the
+  // bounded GET read routes (/health, /v1/blocks, /v1/transactions, /v1/accounts)
+  // with CORS for https://lattice.build. The backbone nodes stay loopback-only
+  // and are intentionally NOT listed here.
   nodeUrls: [
-    "https://lattice-mainnet-iad.fly.dev",
-    "https://lattice-mainnet-ams.fly.dev",
-    "https://lattice-mainnet-sjc.fly.dev",
+    "https://lattice-mainnet-read.fly.dev",
   ],
   // How many recent blocks the home page lists.
   recentBlocks: 15,
