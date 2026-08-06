@@ -633,9 +633,13 @@ async function viewTx(cid) {
   root.appendChild(
     kvRows([
       ["Tx CID", el("span", { class: "mono" }, t.txCID)],
-      ["Block", blockLink(t.blockHeight, "#" + num(t.blockHeight))],
-      ["Block hash", blockLink(t.blockHash, t.blockHash)],
-      ["Timestamp", `${fmtTime(t.timestamp)} (${ago(t.timestamp)})`],
+      // Block linkage (height/hash) and the block timestamp are only shown when
+      // the node supplies them — a content-addressed node has no tx→block
+      // reverse index, so a directly-fetched transaction omits them rather than
+      // rendering dead "#—" links.
+      ["Block", t.blockHeight != null ? blockLink(t.blockHeight, "#" + num(t.blockHeight)) : undefined],
+      ["Block hash", t.blockHash != null ? blockLink(t.blockHash, t.blockHash) : undefined],
+      ["Timestamp", t.timestamp != null ? `${fmtTime(t.timestamp)} (${ago(t.timestamp)})` : undefined],
       ["Fee", num(t.fee)],
       ["Nonce", num(t.nonce)],
       ["Signers", el("div", {}, ...(t.signers || []).map((s) => el("div", {}, addrLink(s, s))))],
