@@ -210,7 +210,7 @@ curl -X POST http://localhost:8080/api/chain/deploy \
 
   <section id="network">
     <h2>Network</h2>
-    <p>Live height and peers read from the public read endpoint, refreshed every 15&nbsp;seconds. The backbone nodes keep their RPC loopback-only by design, so their rows report overlay connectivity as seen from the read endpoint's peer table. Browse Nexus blocks and transactions in the <a href="./explorer/">block explorer</a>.</p>
+    <p>Live height and peers read directly from each node's public read surface, refreshed every 15&nbsp;seconds. Every node serves the bounded read routes itself (<code>--public-read-port</code>); the operator and write surface never leaves loopback. Browse Nexus blocks and transactions in the <a href="./explorer/">block explorer</a>.</p>
     <table>
       <thead><tr><th>Chain</th><th>Region</th><th class="num">Height</th><th class="num">Peers</th><th>Status</th></tr></thead>
       <tbody id="net-rows"></tbody>
@@ -227,64 +227,43 @@ curl -X POST http://localhost:8080/api/chain/deploy \
   </footer>
 
 <script>
-  // The read replica is the public read surface (nginx allowlist over a full
-  // node); the backbones keep RPC loopback-only. Backbone rows report overlay
-  // connectivity from the replica's /api/peers, keyed by process identity.
-  const READ = { region: "read (iad)", url: "https://lattice-mainnet-read.fly.dev" };
-  const BACKBONES = [
-    ["iad", "139b8f3639e7c515417c63bd3a652a5c6fd4a1a2d0baed8e33ea63047995fe64"],
-    ["ams", "35edf67bfe3d612aeb1f0e25da9d3f0ced44dbf79d34f00c548cf9005be6eb7d"],
-    ["sjc", "9cace839489acb30385a9f20025cb9d6365283c81dce14cadab26507065acd4e"]
+  // Every node serves its own bounded public read surface (--public-read-port,
+  // enforced in code); the table reads each one directly.
+  const NODES = [
+    ["iad", "https://lattice-mainnet-iad.fly.dev"],
+    ["ams", "https://lattice-mainnet-ams.fly.dev"],
+    ["sjc", "https://lattice-mainnet-sjc.fly.dev"],
+    ["read (iad)", "https://lattice-mainnet-read.fly.dev"]
   ];
 
   const tbody = document.getElementById("net-rows");
-  tbody.innerHTML = [
-    `<tr id="net-read">
+  tbody.innerHTML = NODES.map(([region, url], i) => `
+    <tr id="net-${i}">
       <td>Nexus</td>
-      <td><a href="${READ.url}/health">${READ.region}</a></td>
+      <td><a href="${url}/health">${region}</a></td>
       <td class="num" data-cell="height">…</td>
       <td class="num" data-cell="peers">…</td>
       <td data-cell="status"><span class="dot"></span>…</td>
-    </tr>`,
-    ...BACKBONES.map(([region]) => `
-    <tr id="net-${region}">
-      <td>Nexus</td>
-      <td>${region}</td>
-      <td class="num">—</td>
-      <td class="num">—</td>
-      <td data-cell="status"><span class="dot"></span>…</td>
-    </tr>`)
-  ].join("");
+    </tr>`).join("");
 
   async function poll() {
-    const readRow = document.getElementById("net-read");
-    const cell = (tr, k) => tr.querySelector(`[data-cell="${k}"]`);
-    let peers = null;
-    try {
-      const health = await (await fetch(READ.url + "/health", { cache: "no-store" })).json();
-      peers = await (await fetch(READ.url + "/api/peers", { cache: "no-store" })).json();
-      readRow.classList.remove("down");
-      cell(readRow, "height").textContent = (health.height ?? "—").toLocaleString();
-      cell(readRow, "peers").textContent = peers.count ?? "—";
-      cell(readRow, "status").innerHTML = `<span class="dot"></span>${health.phase ?? "—"}`;
-    } catch (e) {
-      readRow.classList.add("down");
-      cell(readRow, "height").textContent = "—";
-      cell(readRow, "peers").textContent = "—";
-      cell(readRow, "status").innerHTML = `<span class="dot down"></span>unreachable`;
-    }
-    const connected = new Set((peers?.peers ?? []).map((p) => p.key));
-    for (const [region, key] of BACKBONES) {
-      const tr = document.getElementById(`net-${region}`);
-      if (peers && connected.has(key)) {
+    await Promise.all(NODES.map(async ([region, url], i) => {
+      const tr = document.getElementById(`net-${i}`);
+      const cell = (k) => tr.querySelector(`[data-cell="${k}"]`);
+      try {
+        const health = await (await fetch(url + "/health", { cache: "no-store" })).json();
+        const peers = await (await fetch(url + "/api/peers", { cache: "no-store" })).json();
         tr.classList.remove("down");
-        cell(tr, "status").innerHTML = `<span class="dot"></span>peered`;
-      } else {
+        cell("height").textContent = (health.height ?? "—").toLocaleString();
+        cell("peers").textContent = peers.count ?? "—";
+        cell("status").innerHTML = `<span class="dot"></span>${health.phase ?? "—"}`;
+      } catch (e) {
         tr.classList.add("down");
-        cell(tr, "status").innerHTML =
-          `<span class="dot down"></span>${peers ? "not peered" : "unknown"}`;
+        cell("height").textContent = "—";
+        cell("peers").textContent = "—";
+        cell("status").innerHTML = `<span class="dot down"></span>unreachable`;
       }
-    }
+    }));
   }
 
   poll();
