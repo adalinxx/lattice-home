@@ -114,6 +114,25 @@ const hashEl = (s, tail = 8) =>
     s.length > tail ? el("span", { class: "head" }, s.slice(0, -tail)) : null,
     el("span", { class: "tail" }, s.slice(-tail))
   );
+// Targets serialize without leading zeros, so a hard target ("0x0000…ffff")
+// renders as a wall of f's indistinguishable from the easy genesis target.
+// Pad to the full 64 digits and label the work so difficulty is legible.
+const padTarget = (t) => (t ? "0x" + String(t).replace(/^0x/, "").padStart(64, "0") : t);
+const difficultyBits = (t) => {
+  if (!t) return null;
+  try {
+    const v = BigInt(t);
+    return v > 0n ? 256 - v.toString(2).length : null;
+  } catch (e) { return null; }
+};
+const targetEl = (t) => {
+  if (!t) return "—";
+  const bits = difficultyBits(t);
+  return el("span", { class: "mono" },
+    hashEl(padTarget(t), 10),
+    bits == null ? "" : ` · difficulty ~2^${bits}`
+  );
+};
 const num = (n) => (n == null ? "—" : Number(n).toLocaleString());
 const fmtTime = (ms) => (ms == null ? "—" : new Date(Number(ms)).toLocaleString());
 const ago = (ms) => {
@@ -517,8 +536,8 @@ async function viewBlock(id) {
       ["Child blocks", num(b.childBlockCount)],
       ["Nonce", num(b.nonce)],
       ["Version", b.version],
-      ["Target", el("span", { class: "mono" }, hashEl(b.target, 10))],
-      ["Next target", el("span", { class: "mono" }, hashEl(b.nextTarget, 10))],
+      ["Target", targetEl(b.target)],
+      ["Next target", targetEl(b.nextTarget)],
       ["Transactions CID", el("code", { class: "cid" }, b.transactionsCID)],
       ["Post-state CID", el("code", { class: "cid" }, b.postStateCID)],
       ["Chain", b.chain],
