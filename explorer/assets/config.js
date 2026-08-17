@@ -14,10 +14,4 @@ window.LATTICE_CONFIG = {
   recentBlocks: 15,
   // Poll interval (ms) for the network-status bar when SSE is unavailable.
   pollMs: 6000,
-  // Known browsable endpoints for child chains served by a full node as a CHILD
-  // (queried WITH ?chainPath=<path>, not at root). The served genesis is still
-  // verified against the parent's on-chain anchor before use. Keyed by chainPath.
-  childEndpoints: {
-    "Nexus/toy": "https://lattice-mainnet-toy.fly.dev",
-  },
 };
