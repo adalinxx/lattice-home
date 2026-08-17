@@ -191,15 +191,6 @@ const MAX_ENDPOINT_CANDIDATES = 5; // rendezvous list is attacker-controlled; pr
 // genesisHash to bypass the check). Non-http(s) URLs are never dialed.
 async function verifiedChildEndpoint(childPath, anchorHash) {
   if (!anchorHash) return null; // can't verify without the anchor → treat as unreachable
-  // Known child-serving endpoint (config): a full node serving this chain as a child. Verify its
-  // served genesis (queried WITH chainPath) matches the anchor.
-  const known = (window.LATTICE_CONFIG.childEndpoints || {})[childPath];
-  if (known && isHttpUrl(known)) {
-    try {
-      const g = await rawFetch(known, "/api/chain/genesis", { chainPath: childPath });
-      if (g.genesisHash === anchorHash) return known;
-    } catch { /* dead / no CORS → fall through */ }
-  }
   let list;
   try { list = (await api("/api/chain/endpoints", { chainPath: childPath })).endpoints || []; }
   catch { return null; }
@@ -253,23 +244,6 @@ async function resolveChainEndpoint(chainPath) {
   if (!chainPath) return { ep: null, path: null };
   const c = _access.get(chainPath);
   if (c && Date.now() - c.t < 60000) return c.val;
-
-  // Known child-serving endpoint (config): a full node serving this chain as a CHILD (queried
-  // with chainPath). Verify the served genesis matches the parent's on-chain anchor before use.
-  const known = (window.LATTICE_CONFIG.childEndpoints || {})[chainPath];
-  if (known && isHttpUrl(known)) {
-    try {
-      const parent = chainPath.split("/").slice(0, -1).join("/");
-      const kids = (await backboneGet("/api/chain/children", { chainPath: parent })).children || [];
-      const anchor = (kids.find((k) => k.chainPath.join("/") === chainPath) || {}).genesisHash;
-      const g = anchor ? await rawFetch(known, "/api/chain/genesis", { chainPath }) : null;
-      if (g && g.genesisHash === anchor) {
-        const val = { ep: known, path: chainPath };
-        _access.set(chainPath, { val, t: Date.now() });
-        return val;
-      }
-    } catch { /* fall through to rendezvous */ }
-  }
 
   let ep = null;
   try { await backboneGet("/api/block/latest", { chainPath }); } // backbone can proxy it → no direct endpoint needed
