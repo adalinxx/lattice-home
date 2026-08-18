@@ -185,6 +185,25 @@ function classifyTip(latest, spec) {
 
 const MAX_ENDPOINT_CANDIDATES = 5; // rendezvous list is attacker-controlled; probe only a few
 
+// Bring-your-own-node: a user-supplied endpoint for a chain, persisted only in
+// this browser. It is a candidate like any discovered endpoint — verified by
+// the same positive genesis match, never trusted for data integrity.
+const userEndpointKey = (chainPath) => `lattice-user-endpoint:${chainPath}`;
+function userEndpoint(chainPath) {
+  try {
+    const u = localStorage.getItem(userEndpointKey(chainPath));
+    return u && isHttpUrl(u) ? u.replace(/\/$/, "") : null;
+  } catch { return null; }
+}
+function setUserEndpoint(chainPath, url) {
+  try {
+    if (url) localStorage.setItem(userEndpointKey(chainPath), url);
+    else localStorage.removeItem(userEndpointKey(chainPath));
+  } catch { /* storage unavailable */ }
+  _probe.delete(chainPath);
+  _access.delete(chainPath);
+}
+
 // A directly-served child node (from GET /api/chain/endpoints on the parent) is TRUSTED only
 // on a POSITIVE genesis match against the parent's anchor. Missing anchor or missing/omitted
 // served genesisHash → NOT trusted (an attacker who controls the endpoint could otherwise omit
@@ -193,8 +212,10 @@ async function verifiedChildEndpoint(childPath, anchorHash) {
   if (!anchorHash) return null; // can't verify without the anchor → treat as unreachable
   let list;
   try { list = (await api("/api/chain/endpoints", { chainPath: childPath })).endpoints || []; }
-  catch { return null; }
-  for (const e of list.slice(0, MAX_ENDPOINT_CANDIDATES)) {
+  catch { list = []; }
+  const own = userEndpoint(childPath);
+  if (own) list = [{ rpcUrl: own }, ...list];
+  for (const e of list.slice(0, MAX_ENDPOINT_CANDIDATES + 1)) {
     if (!e || !isHttpUrl(e.rpcUrl)) continue;
     try {
       const info = await rawFetch(e.rpcUrl, "/api/chain/info");
@@ -261,8 +282,10 @@ async function resolveChainEndpoint(chainPath) {
           list = (await getFrom(base, "/api/chain/endpoints", { chainPath: sub })).endpoints || [];
         } catch { base = null; break; }
         if (!anchor) { base = null; break; } // no anchor → can't verify this level → give up
+        const own = userEndpoint(sub);
+        if (own) list = [{ rpcUrl: own }, ...list];
         let hop = null;
-        for (const e of list.slice(0, MAX_ENDPOINT_CANDIDATES)) {
+        for (const e of list.slice(0, MAX_ENDPOINT_CANDIDATES + 1)) {
           if (!e || !isHttpUrl(e.rpcUrl)) continue;
           try { const info = await rawFetch(e.rpcUrl, "/api/chain/info");
             if (info.genesisHash === anchor) { hop = e.rpcUrl; break; } } catch {} // positive match only
@@ -282,7 +305,7 @@ const getFrom = (base, path, params) => (base ? rawFetch(base, path, params) : b
 function statusBadge(status) {
   const S = {
     live: ["#38d66b", "live", "a node is serving this chain"],
-    offline: ["#8a8f98", "offline", "anchored on its parent, but no reachable node is serving it now"],
+    offline: ["#8a8f98", "no endpoint", "anchored on its parent (verified); no browser-dialable node discovered — run a node to read this chain, or connect your own"],
     unknown: ["#8a8f98", "…", "checking…"],
   };
   const [color, label, tip] = S[status] || S.unknown;
@@ -385,7 +408,45 @@ function renderOfflineChain(chainPath) {
   const root = el("div");
   root.appendChild(chainCrumbs(chainPath));
   root.appendChild(el("h1", {}, chainPath.split("/").pop()));
-  root.appendChild(el("p", { class: "empty" }, `${chainPath} is anchored on its parent, but no reachable node is serving it right now.`));
+  root.appendChild(el("p", { class: "empty" },
+    `${chainPath} is anchored on its parent (verified on-chain), but no browser-dialable node was discovered. The chain itself may be perfectly alive — a browser page is a convenience view, not the trust path.`));
+  root.appendChild(el("h3", {}, "Read it sovereignly"));
+  root.appendChild(el("p", {}, "Any node can join this chain permissionlessly from its on-chain genesis record:"));
+  root.appendChild(el("pre", {}, el("code", {}, `lattice child adopt ${chainPath}`)));
+  root.appendChild(el("p", {},
+    link("https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md", "Getting started"),
+    " · your own node is the trustless way to read any chain."));
+  root.appendChild(el("h3", {}, "Or connect a node you trust"));
+  root.appendChild(el("p", {}, "If you know a node serving this chain's public reads, connect it. The choice is stored only in this browser, and its served genesis is verified against the on-chain anchor before use."));
+  const input = el("input", {
+    type: "url", placeholder: "https://node.example.org",
+    value: userEndpoint(chainPath) || "", style: "min-width:22em;margin-right:.6em;",
+  });
+  const note = el("span", { class: "empty" }, "");
+  root.appendChild(el("p", {},
+    input,
+    el("button", { onclick: async () => {
+      const url = input.value.trim().replace(/\/$/, "");
+      if (!url) { setUserEndpoint(chainPath, null); note.textContent = "cleared"; return; }
+      if (!isHttpUrl(url)) { note.textContent = "not an http(s) URL"; return; }
+      note.textContent = "verifying genesis…";
+      setUserEndpoint(chainPath, url);
+      const parent = chainPath.split("/").slice(0, -1).join("/");
+      let anchor = null;
+      try {
+        const kids = (await backboneGet("/api/chain/children", { chainPath: parent })).children || [];
+        anchor = (kids.find((k) => k.chainPath.join("/") === chainPath) || {}).genesisHash;
+      } catch { /* anchor unavailable */ }
+      const verified = anchor ? await verifiedChildEndpoint(chainPath, anchor) : null;
+      if (verified === url) {
+        note.textContent = "verified — loading…";
+        router();
+      } else {
+        setUserEndpoint(chainPath, null);
+        note.textContent = "endpoint did not serve the anchored genesis; not saved";
+      }
+    } }, "Connect"),
+    " ", note));
   setView(root);
 }
 
