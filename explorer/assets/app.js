@@ -389,11 +389,14 @@ async function chainsSection(host) {
   }
   for (const c of kids) {
     const path = c.chainPath.join("/");
+    // The children API names a child by its full chainPath; the row label is
+    // the child's own directory atom (the last path element).
+    const label = c.chainPath[c.chainPath.length - 1];
     const badgeCell = el("td", {}, statusBadge("unknown"));
     const heightCell = el("td", { class: "num hide-sm" }, "—");
     tbody.appendChild(
       el("tr", {},
-        el("td", {}, link(`#/?c=${encodeURIComponent(path)}`, c.directory)),
+        el("td", {}, link(`#/?c=${encodeURIComponent(path)}`, label)),
         badgeCell, heightCell,
         el("td", { class: "hide-sm" }, hashEl(c.genesisHash, 6)))
     );
