@@ -837,7 +837,12 @@ async function router() {
   let query = "";
   const qi = hash.indexOf("?");
   if (qi >= 0) { query = hash.slice(qi + 1); hash = hash.slice(0, qi); }
-  const chain = new URLSearchParams(query).get("c") || null;
+  // Normalize the chain param the way the search bar normalizes typed input:
+  // the node's path grammar is canonical (no empty atoms), so a trailing
+  // slash would otherwise turn "Nexus/" into an unknown chain. A bare root
+  // (any case) is the default view.
+  const rawChain = (new URLSearchParams(query).get("c") || "").replace(/\/+$/, "");
+  const chain = !rawChain || rawChain.toLowerCase() === "nexus" ? null : rawChain;
   // Resolve how to reach this chain (backbone proxy vs a directly-served child node via the
   // rendezvous) BEFORE touching globals, then apply atomically — so a faster later navigation
   // can't have its scope corrupted by this one's multi-round-trip resolution.
