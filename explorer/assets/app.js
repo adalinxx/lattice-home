@@ -217,7 +217,8 @@ const parentOf = (chainPath) => chainPath.split("/").slice(0, -1).join("/");
 // configured Nexus nodes for the root). P's endpoint names the child block P commits under
 // the child's directory and the read URLs hosts declared for it (unverified). A candidate —
 // P's own endpoint, the browser's choice, then each declared URL — is accepted only if it
-// serves that committed block on the child chain: a POSITIVE match, never an omission.
+// reports that committed block on the child chain: a POSITIVE match, never an omission. This is a
+// consistency check, not proof (the browser gets JSON, not hashable bytes); the view says so.
 // Resolves to { ep } (null = configured nodes) or { ep: undefined } when nothing verified.
 // PURE w.r.t. globals so a concurrent navigation can't corrupt it. Cached ~60s.
 const MAX_CHAIN_DEPTH = 8;
@@ -433,6 +434,10 @@ async function viewHome() {
   // Location cue: breadcrumbs on a child chain, a dashboard title at the root. The search bar
   // (below) also navigates to any chain by path, so the path isn't repeated up here.
   if (state.chain) root.appendChild(chainCrumbs(state.chain));
+  // A child chain's endpoint is an operator's declaration that CLAIMS the block its parent
+  // commits; the browser cannot hash-check that claim. Say whose data this is.
+  if (state.chainEndpoint) root.appendChild(el("p", { class: "empty" },
+    `Served by ${new URL(state.chainEndpoint).host} — an operator-declared endpoint that reports the block its parent commits. Not independently verified; your own node is the trustless way to read this chain.`));
   else root.appendChild(el("h1", {}, "Network overview"));
 
   const cards = el("div", { class: "cards" });
@@ -792,11 +797,11 @@ async function resolveSearch(q) {
     location.hash = !p || p.toLowerCase() === "nexus" ? "#/" : `#/?c=${encodeURIComponent(p)}`;
     return;
   }
-  if (/^\d+$/.test(q)) { location.hash = `#/block/${q}`; return; }
+  if (/^\d+$/.test(q)) { location.hash = `#/block/${q}${chainQ()}`; return; }
   // Try block hash, then tx CID, then treat as an address.
-  try { await api(`/api/block/${encodeURIComponent(q)}`); location.hash = `#/block/${encodeURIComponent(q)}`; return; } catch (e) { if (e.status !== 404) {} }
-  try { await api(`/api/transaction/${encodeURIComponent(q)}`); location.hash = `#/tx/${encodeURIComponent(q)}`; return; } catch (e) { if (e.status !== 404) {} }
-  location.hash = `#/address/${encodeURIComponent(q)}`;
+  try { await api(`/api/block/${encodeURIComponent(q)}`); location.hash = `#/block/${encodeURIComponent(q)}${chainQ()}`; return; } catch (e) { if (e.status !== 404) {} }
+  try { await api(`/api/transaction/${encodeURIComponent(q)}`); location.hash = `#/tx/${encodeURIComponent(q)}${chainQ()}`; return; } catch (e) { if (e.status !== 404) {} }
+  location.hash = `#/address/${encodeURIComponent(q)}${chainQ()}`;
 }
 
 /* ----------------------------- router ---------------------------- */
