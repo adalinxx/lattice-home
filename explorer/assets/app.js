@@ -22,7 +22,7 @@ function rotateNode() {
 
 const state = {
   chain: null,         // current chainPath ("Nexus/Mid/…"); null = root (Nexus). From the ?c= hash suffix.
-  chainEndpoint: null, // the verified URL serving the current chain; null = the configured
+  chainEndpoint: null, // the matched URL serving the current chain; null = the configured
                        // Nexus nodes. Always scoped with ?chainPath= (resolveChain).
 };
 
@@ -78,7 +78,7 @@ async function backboneGet(path, params) {
   throw lastErr || new Error("All nodes unreachable");
 }
 
-// View data source for the CURRENT chain: its verified endpoint (or the configured Nexus
+// View data source for the CURRENT chain: its matched endpoint (or the configured Nexus
 // nodes), scoped by ?chainPath=. An explicit params.chainPath always wins.
 async function api(path, params) {
   const p = { ...(params || {}) };
@@ -155,6 +155,10 @@ const addrLink = (a, text) => link(`#/address/${encodeURIComponent(a)}${chainQ()
 function setView(node) {
   const v = $("#view");
   v.innerHTML = "";
+  // Every view of a chain read through an operator-declared endpoint says so: that endpoint
+  // CLAIMS the block its parent commits; the browser cannot hash-check the claim.
+  if (state.chainEndpoint) v.appendChild(el("p", { class: "empty" },
+    `Served by ${new URL(state.chainEndpoint).host}, an operator-declared endpoint that reports the block its parent commits. Not independently verified; your own node is the trustless way to read this chain.`));
   v.appendChild(node);
   window.scrollTo(0, 0);
 }
@@ -190,7 +194,7 @@ function classifyTip(latest) {
 const MAX_ENDPOINT_CANDIDATES = 5;
 
 // Bring-your-own-node: a user-supplied endpoint for a chain, persisted only in
-// this browser. It is a candidate like any discovered endpoint — verified by
+// this browser. It is a candidate like any discovered endpoint — checked by
 // the same commitment match, never trusted for data integrity.
 const userEndpointKey = (chainPath) => `lattice-user-endpoint:${chainPath}`;
 function userEndpoint(chainPath) {
@@ -209,17 +213,17 @@ function setUserEndpoint(chainPath, url) {
 }
 
 // One read against a resolved endpoint: null = the configured Nexus nodes (with failover),
-// else a verified URL. Every request names the chain it reads with ?chainPath=.
+// else a matched URL. Every request names the chain it reads with ?chainPath=.
 const getFrom = (base, path, params) => (base ? rawFetch(base, path, params) : backboneGet(path, params));
 const parentOf = (chainPath) => chainPath.split("/").slice(0, -1).join("/");
 
-// THE resolver, the same at every depth. A chain's parent P has a verified endpoint (the
+// THE resolver, the same at every depth. A chain's parent P has a matched endpoint (the
 // configured Nexus nodes for the root). P's endpoint names the child block P commits under
 // the child's directory and the read URLs hosts declared for it (unverified). A candidate —
 // P's own endpoint, the browser's choice, then each declared URL — is accepted only if it
 // reports that committed block on the child chain: a POSITIVE match, never an omission. This is a
 // consistency check, not proof (the browser gets JSON, not hashable bytes); the view says so.
-// Resolves to { ep } (null = configured nodes) or { ep: undefined } when nothing verified.
+// Resolves to { ep } (null = configured nodes) or { ep: undefined } when nothing matched.
 // PURE w.r.t. globals so a concurrent navigation can't corrupt it. Cached ~60s.
 const MAX_CHAIN_DEPTH = 8;
 const _access = new Map();
@@ -232,17 +236,17 @@ async function resolveChain(chainPath) {
   if (parts.length >= 2 && parts.length <= MAX_CHAIN_DEPTH && parts.every(Boolean)) {
     const parent = parentOf(chainPath);
     const up = await resolveChain(parent === "Nexus" ? null : parent);
-    if (up.ep !== undefined) val = await verifiedChildEndpoint(up.ep, chainPath);
+    if (up.ep !== undefined) val = await matchedChildEndpoint(up.ep, chainPath);
   }
   _access.set(chainPath, { val, t: Date.now() });
   return val;
 }
 
-async function verifiedChildEndpoint(parentEp, chainPath) {
+async function matchedChildEndpoint(parentEp, chainPath) {
   let listing = null;
   try { listing = await getFrom(parentEp, "/api/chain/endpoints", { chainPath }); } catch { /* none */ }
   const committed = listing && listing.committedBlock;
-  if (!committed) return { ep: undefined }; // nothing to verify against → unreachable
+  if (!committed) return { ep: undefined }; // nothing to match against → unreachable
   const own = userEndpoint(chainPath);
   const declared = (listing.endpoints || []).filter(isDeclarableUrl).map((u) => u.replace(/\/$/, ""));
   const candidates = [parentEp, ...new Set([...(own ? [own] : []), ...declared])].slice(0, MAX_ENDPOINT_CANDIDATES + 1);
@@ -264,7 +268,7 @@ async function probeChain(chainPath) {
   const { ep } = await resolveChain(chainPath);
   if (ep !== undefined) {
     try { out = { t: Date.now(), ...classifyTip(await getFrom(ep, "/api/block/latest", { chainPath })) }; }
-    catch { /* endpoint died between verification and probe */ }
+    catch { /* endpoint died between the match and the probe */ }
   }
   _probe.set(chainPath, out);
   return out;
@@ -273,7 +277,7 @@ async function probeChain(chainPath) {
 function statusBadge(status) {
   const S = {
     live: ["#38d66b", "live", "a node is serving this chain"],
-    offline: ["#8a8f98", "no endpoint", "committed on its parent; no declared read endpoint verified — run a node to read this chain, or connect your own"],
+    offline: ["#8a8f98", "no endpoint", "committed on its parent; no declared read endpoint matched its parent's commitment — run a node to read this chain, or connect your own"],
     unknown: ["#8a8f98", "…", "checking…"],
   };
   const [color, label, tip] = S[status] || S.unknown;
@@ -380,7 +384,7 @@ function renderOfflineChain(chainPath) {
   root.appendChild(chainCrumbs(chainPath));
   root.appendChild(el("h1", {}, chainPath.split("/").pop()));
   root.appendChild(el("p", { class: "empty" },
-    `No read endpoint for ${chainPath} could be verified against the block its parent commits. The chain itself may be perfectly alive — a browser page is a convenience view, not the trust path.`));
+    `No read endpoint for ${chainPath} was found reporting the block its parent commits. The chain itself may be perfectly alive — a browser page is a convenience view, not the trust path.`));
   root.appendChild(el("h3", {}, "Read it sovereignly"));
   root.appendChild(el("p", {}, "Any node can host this chain permissionlessly: list it (and its ancestors) in hostedChains. To list it here, also set publicReadURL to the node's public read URL."));
   root.appendChild(el("p", {},
@@ -399,11 +403,11 @@ function renderOfflineChain(chainPath) {
       const url = input.value.trim().replace(/\/$/, "");
       if (!url) { setUserEndpoint(chainPath, null); note.textContent = "cleared"; return; }
       if (!isHttpUrl(url)) { note.textContent = "not an http(s) URL"; return; }
-      note.textContent = "verifying…";
+      note.textContent = "checking…";
       setUserEndpoint(chainPath, url);
       const { ep } = await resolveChain(chainPath);
       if (ep === url) {
-        note.textContent = "verified — loading…";
+        note.textContent = "matches the parent's commitment — loading…";
         router();
       } else {
         setUserEndpoint(chainPath, null);
@@ -424,7 +428,7 @@ async function viewHome() {
   try {
     latest = await api("/api/block/latest");
   } catch (e) {
-    // A scoped child chain that no verified node serves: say so, not an error.
+    // A scoped child chain that no matched node serves: say so, not an error.
     if (state.chain) return renderOfflineChain(state.chain);
     return showError(e);
   }
@@ -434,10 +438,6 @@ async function viewHome() {
   // Location cue: breadcrumbs on a child chain, a dashboard title at the root. The search bar
   // (below) also navigates to any chain by path, so the path isn't repeated up here.
   if (state.chain) root.appendChild(chainCrumbs(state.chain));
-  // A child chain's endpoint is an operator's declaration that CLAIMS the block its parent
-  // commits; the browser cannot hash-check that claim. Say whose data this is.
-  if (state.chainEndpoint) root.appendChild(el("p", { class: "empty" },
-    `Served by ${new URL(state.chainEndpoint).host} — an operator-declared endpoint that reports the block its parent commits. Not independently verified; your own node is the trustless way to read this chain.`));
   else root.appendChild(el("h1", {}, "Network overview"));
 
   const cards = el("div", { class: "cards" });
