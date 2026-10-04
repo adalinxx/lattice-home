@@ -786,38 +786,42 @@ async function viewAddress(addr) {
   setView(root);
 }
 
-/* ------------------------- live updates (SSE) -------------------- */
+/* ------------------------- live updates (poll) ------------------- */
 
-let sse = null;
+// The public read replica serves bounded GET reads only (no /ws), so the
+// latest-blocks table polls the tip and prepends any blocks it has not shown.
+const LIVE_POLL_MS = 30_000;
+let livePoll = null;
 function startLiveBlocks(tbody) {
-  if (sse) { sse.close(); sse = null; }
-  if (typeof EventSource === "undefined") return;
-  try {
-    const url = new URL(activeNode() + "/ws");
-    url.searchParams.set("events", "newBlock");
-    if (state.chain) url.searchParams.set("chainPath", state.chain);
-    sse = new EventSource(url);
-    // The node frames every event as `data: {"event":...,"data":{...}}` with no
-    // SSE `event:` field, so all events arrive via the default message handler.
-    sse.onmessage = async (ev) => {
-      let env;
-      try { env = JSON.parse(ev.data); } catch { return; }
-      if (!env || env.event !== "newBlock" || !env.data) return;
-      if (!document.body.contains(tbody)) { sse.close(); sse = null; return; }
-      const d = env.data;
-      // Skip if already shown (poll + SSE overlap).
-      if (tbody.querySelector(`tr[data-height="${d.height}"]`)) return;
-      const b = await api(`/api/block/${d.height}`).catch(() => null);
-      if (!b || !document.body.contains(tbody)) return;
-      const row = blockRow(b);
-      row.classList.add("new-row");
-      tbody.insertBefore(row, tbody.firstChild);
+  if (livePoll) { clearInterval(livePoll); livePoll = null; }
+  let ticking = false;
+  const tick = async () => {
+    if (!document.body.contains(tbody)) { clearInterval(livePoll); livePoll = null; return; }
+    if (ticking) return;
+    ticking = true;
+    try {
+      const latest = await api("/api/block/latest").catch(() => null);
+      if (!latest || typeof latest.height !== "number" || !document.body.contains(tbody)) return;
+      const top = tbody.querySelector("tr[data-height]");
+      const shown = top ? Number(top.dataset.height) : latest.height - 1;
+      const from = Math.max(shown + 1, latest.height - CFG.recentBlocks + 1);
+      for (let h = from; h <= latest.height; h++) {
+        if (tbody.querySelector(`tr[data-height="${h}"]`)) continue;
+        const b = await api(`/api/block/${h}`).catch(() => null);
+        if (!b || !document.body.contains(tbody)) return;
+        const row = blockRow(b);
+        row.classList.add("new-row");
+        tbody.querySelector("td.empty")?.closest("tr")?.remove();
+        tbody.insertBefore(row, tbody.firstChild);
+      }
       while (tbody.children.length > CFG.recentBlocks) tbody.removeChild(tbody.lastChild);
       const nh = $("#ns-height");
-      if (nh) nh.textContent = num(b.height);
-    };
-    sse.onerror = () => { /* EventSource auto-reconnects; nothing to do */ };
-  } catch { /* SSE unsupported / blocked — home still polls on navigation */ }
+      if (nh) nh.textContent = num(latest.height);
+    } finally {
+      ticking = false;
+    }
+  };
+  livePoll = setInterval(tick, LIVE_POLL_MS);
 }
 
 /* ----------------------------- search ---------------------------- */
