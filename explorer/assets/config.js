@@ -4,7 +4,8 @@ window.LATTICE_CONFIG = {
   // Public read surface for Nexus mainnet, tried in order (requests fail over to
   // the next on a dead node or a 5xx). These are read replicas: an nginx
   // allowlist proxy in front of a full node's loopback RPC, exposing only the
-  // bounded GET read routes (/health, /v1/blocks, /v1/transactions, /v1/accounts)
+  // bounded GET read routes (/health, /api/chain/*, /api/block/*, /api/transaction/*,
+  // /api/state/account/*, /api/mempool, /api/peers)
   // with CORS for https://lattice.build. The backbone nodes stay loopback-only
   // and are intentionally NOT listed here.
   nodeUrls: [

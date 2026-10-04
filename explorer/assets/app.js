@@ -379,9 +379,13 @@ async function chainsSection(host) {
   let kids;
   try {
     kids = (await api("/api/chain/children", { limit: 200 })).children || [];
-  } catch {
-    tbody.appendChild(el("tr", {}, el("td", { colspan: 4, class: "empty" }, "Couldn't load child chains.")));
-    return;
+  } catch (e) {
+    // A node with no child-chain directory route answers 404: that is "no child chains", not a failure.
+    if (e.status !== 404) {
+      tbody.appendChild(el("tr", {}, el("td", { colspan: 4, class: "empty" }, "Couldn't load child chains.")));
+      return;
+    }
+    kids = [];
   }
   if (!kids.length) {
     tbody.appendChild(el("tr", {}, el("td", { colspan: 4, class: "empty" }, "No child chains.")));
@@ -572,6 +576,10 @@ async function viewBlock(id) {
       ["Parent", b.previousBlock ? blockLink(b.previousBlock, b.previousBlock) : el("span", { class: "pill dim" }, "genesis")],
       ["Transactions", num(b.transactionCount)],
       ["Child blocks", num(b.childBlockCount)],
+      // Coinbase: the header's rewardRecipient is credited reward + fees (no reward transaction).
+      // Older nodes name the credit rewardAmount; rows are omitted when the node sends neither.
+      ["Reward recipient", b.rewardRecipient != null ? addrLink(b.rewardRecipient, b.rewardRecipient) : undefined],
+      ["Reward credited", (b.rewardCredited ?? b.rewardAmount) != null ? num(b.rewardCredited ?? b.rewardAmount) : undefined],
       ["Nonce", num(b.nonce)],
       ["Version", b.version],
       ["Target", targetEl(b.target)],
@@ -747,13 +755,13 @@ async function viewAddress(addr) {
   const root = el("div");
   root.appendChild(el("div", { class: "crumbs" }, link("#/", "Home"), " / Account"));
   root.appendChild(el("h1", {}, "Account"));
-  root.appendChild(el("p", { class: "sub mono" }, a.address));
+  root.appendChild(el("p", { class: "sub mono" }, a.address ?? a.owner ?? addr));
 
   const cards = el("div", { class: "cards" });
   cards.appendChild(card("Balance", num(a.balance)));
   cards.appendChild(card("Nonce", num(a.nonce)));
-  cards.appendChild(card("Recent txs", num(a.transactionCount)));
-  cards.appendChild(card("Status", el("span", { class: a.exists ? "pill good" : "pill dim" }, a.exists ? "active" : "unseen")));
+  if (a.transactionCount != null) cards.appendChild(card("Recent txs", num(a.transactionCount)));
+  if (a.exists != null) cards.appendChild(card("Status", el("span", { class: a.exists ? "pill good" : "pill dim" }, a.exists ? "active" : "unseen")));
   root.appendChild(cards);
 
   const txs = a.recentTransactions || [];

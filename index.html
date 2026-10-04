@@ -146,56 +146,53 @@ figure.term pre code { border: 0; padding: 0; font-size: inherit; color: inherit
 
   <section id="quickstart">
     <h2>Quickstart</h2>
-    <p>The full node serves RPC, gossip, trustless sync, mempool, and child-chain deploy. Mining is external — the node serves block templates and runs no mining loop, so you bring up a node first and then point a miner at it.</p>
+    <p>One <code>lattice-node</code> process hosts one chain tree: RPC, gossip, trustless sync, and mempool for Nexus and any child chains you host. Mining is external — the node serves block templates and validates solutions; <code>lattice-mining-coordinator</code> assigns nonce ranges to stateless <code>lattice-miner</code> workers.</p>
 <figure class="term">
 <figcaption>run a node</figcaption>
 <pre><code>git clone https://github.com/adalinxx/lattice-node
 cd lattice-node
 swift build -c release
-
-# Join the network. Built-in seeds and the default --min-peer-key-bits (16) let a bare
-# node discover peers and sync on its own — no --peer or key-bits flag to set.
-.build/release/LatticeNode --autosize --rpc-port 8080
-
-# In another shell, confirm it's up and syncing:
-curl http://localhost:8080/api/chain/info</code></pre>
+# Write node-data/lattice.json + identity. With no "peers" field the node
+# uses the built-in Nexus bootstrap set.
+.build/release/lattice init --root node-data
+.build/release/lattice up --root node-data
+# Confirm it's up and syncing:
+.build/release/lattice status --root node-data
+curl -s http://127.0.0.1:8080/health</code></pre>
 </figure>
-    <p>With a node running, attach a miner. Mining lives in a separate process: the node hands out templates; a worker — driven by the coordinator via <code>--worker-executable</code> — searches the easiest target across the chains you subscribe to, and each solution is accepted by whichever chains it clears. The bundled <code>lattice-miner</code> is a CPU worker; <a href="https://github.com/adalinxx/lattice-miner-gpu">lattice-miner-gpu</a> is a GPU worker that auto-detects CUDA (NVIDIA), Metal (Apple), or OpenCL (AMD/Intel). Any miner that implements the worker protocol plugs in.</p>
+    <p>To mine, add a <code>mine</code> object to <code>lattice.json</code> and start the mining loop. Blocks carry no reward transaction: each block's header names a <code>rewardRecipient</code>, credited the block reward plus fees. Configure a recipient for every chain you mine; an omitted recipient burns that chain's payout. The bundled <code>lattice-miner</code> is a CPU worker; <a href="https://github.com/adalinxx/lattice-miner-gpu">lattice-miner-gpu</a> is a GPU worker. Any miner that implements the worker protocol plugs in.</p>
 <figure class="term">
-<figcaption>attach a miner</figcaption>
-<pre><code># Point the coordinator at a running node; it spawns CPU miner workers.
-lattice-mining-coordinator \
-  --node http://127.0.0.1:8080/api \
-  --rpc-cookie-file ~/.lattice/.cookie \
-  --worker-executable "$(command -v lattice-miner)" \
-  --workers 2</code></pre>
+<figcaption>mine</figcaption>
+<pre><code># node-data/lattice.json
+{
+  "listen": 4001,
+  "rpc": 8080,
+  "mine": {
+    "worker": "cpu",
+    "workers": 2,
+    "recipients": { "Nexus": "&lt;nexus-address&gt;" }
+  }
+}
+
+.build/release/lattice mine start --root node-data
+.build/release/lattice mine status --root node-data</code></pre>
 </figure>
-    <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md">Getting started</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/operations.md">Operations</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/mining-worker-protocol.md">Worker protocol</a></p>
+    <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md">Getting started</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/operator-cli.md">Operator CLI</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/operations.md">Operations</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/mining-workers.md">Mining workers</a></p>
   </section>
 
   <section id="build">
     <h2>Build a chain</h2>
-    <p>Deploy a child chain under any parent and define its validity with a policy — opt-in, chain-defined rules enforced by every subscriber. Policies are deterministic validity, not permissionless contracts.</p>
+    <p>Create a child chain under any hosted parent and define its validity with a policy — opt-in, chain-defined rules enforced by every subscriber. Policies are deterministic validity, not permissionless contracts.</p>
 <figure class="term">
-<figcaption>deploy a chain</figcaption>
-<pre><code># Deploy a child chain under Nexus (privileged — uses the node's RPC cookie).
-curl -X POST http://localhost:8080/api/chain/deploy \
-  -H "Authorization: Bearer $(cat ~/.lattice/.cookie)" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "directory": "Payments",
-    "parentDirectory": "Nexus",
-    "targetBlockTime": 3600000,
-    "initialReward": 1048576,
-    "halvingInterval": 876600,
-    "maxTransactionsPerBlock": 5000,
-    "maxStateGrowth": 3000000,
-    "maxBlockSize": 10000000,
-    "retargetWindow": 100,
-    "wasmPolicies": []
-  }'</code></pre>
+<figcaption>create a chain</figcaption>
+<pre><code># Host a child chain under Nexus (or pass --spec with a full ChainSpec JSON,
+# wasmPolicies included).
+.build/release/lattice child create Nexus/Payments \
+  --root node-data \
+  --reward 1000 \
+  --block-time 10000</code></pre>
 </figure>
-    <p>Deploy defines the chain and returns its genesis — but the child runs as its <strong>own process</strong> that subscribes to the parent for blocks, not inside this node. Spawn it with the returned <code>genesisHex</code> (<code>--genesis-hex --chain-directory --subscribe-p2p --peer</code>), register its RPC, then point a miner at it with <code>--child-node</code> to merge-mine parent and child in one search — see the <a href="https://github.com/adalinxx/lattice-node/blob/main/deploy/README.md">per-process child-chain runbook</a>. It becomes discoverable to every node once a <strong>genesis-action transaction</strong> for it lands in the parent chain — an ordinary mempool transaction any miner can include, so it isn't tied to your node winning a block and survives your node going offline. The parent records only the opaque <code>{directory, genesis-CID}</code> anchor; it never judges the child's contents.</p>
+    <p>This writes one immutable spec, adds <code>Nexus/Payments</code> to <code>hostedChains</code>, and restarts a running host. The child runs inside the same node process; its genesis is built from the spec and mined through its parent's child commitment by ordinary merged mining. There is no deploy endpoint or parent authorization transaction. Add a recipient for the child under <code>mine.recipients</code> to be paid on it.</p>
     <p><a href="https://github.com/adalinxx/lattice-node/blob/main/docs/rpc-api.md">RPC API</a> · <a href="https://github.com/adalinxx/lattice-node/blob/main/docs/protocol.md">Protocol</a></p>
   </section>
 
@@ -210,7 +207,8 @@ curl -X POST http://localhost:8080/api/chain/deploy \
 
   <section id="network">
     <h2>Network</h2>
-    <p>Live height and peers read directly from each node's public read surface, refreshed every 15&nbsp;seconds. Every node serves the bounded read routes itself (<code>--public-read-port</code>); the operator and write surface never leaves loopback. Browse Nexus blocks and transactions in the <a href="./explorer/">block explorer</a>.</p>
+    <p>Live height and peers read directly from each node's public read surface, refreshed every 15&nbsp;seconds. Every node serves the bounded read routes itself (<code>publicRead</code> in <code>lattice.json</code>); the operator and write surface never leaves loopback. Browse Nexus blocks and transactions in the <a href="./explorer/">block explorer</a>.</p>
+    <p>Nexus genesis: <code>bafyreiggtg4ezifboyekbf4gxst2jr3mpjqcxsbmopy7w6fp46g4ngpgxa</code> (2026-10-04 06:19:59&nbsp;UTC).</p>
     <table>
       <thead><tr><th>Chain</th><th>Region</th><th class="num">Height</th><th class="num">Peers</th><th>Status</th></tr></thead>
       <tbody id="net-rows"></tbody>
@@ -233,6 +231,7 @@ curl -X POST http://localhost:8080/api/chain/deploy \
     ["iad", "https://lattice-mainnet-iad.fly.dev"],
     ["ams", "https://lattice-mainnet-ams.fly.dev"],
     ["sjc", "https://lattice-mainnet-sjc.fly.dev"],
+    ["testnet", "https://lattice-mainnet-testnet.fly.dev"],
     ["read (iad)", "https://lattice-mainnet-read.fly.dev"]
   ];
 
