@@ -49,6 +49,32 @@ function isDeclarableUrl(u) {
   } catch { return false; }
 }
 
+// Wide consensus integers arrive as canonical decimal strings (current nodes) or JSON
+// numbers (older nodes, during the rollout). Normalize both at this one boundary, by field
+// name: heights and millisecond timestamps stay well under 2^53, so they become Numbers;
+// balances, nonces, deltas and amounts can exceed it, so they become BigInts.
+const SAFE_INT_FIELDS = new Set([
+  "height", "blockHeight", "timestamp", "nextBefore", "revision",
+  "targetBlockTime", "halvingInterval", "halfLife",
+]);
+const BIG_INT_FIELDS = new Set([
+  "balance", "nonce", "delta", "amountDemanded", "amountDeposited", "amountWithdrawn",
+  "rewardCredited", "rewardAmount", "initialReward", "premine", "minRelayFee",
+  "maxNumberOfTransactionsPerBlock",
+]);
+const isWideInt = (v) => typeof v === "number" ? Number.isInteger(v) : typeof v === "string" && /^(?:0|-?[1-9][0-9]*)$/.test(v);
+function readInts(v) {
+  if (Array.isArray(v)) return v.map(readInts);
+  if (v === null || typeof v !== "object") return v;
+  const out = {};
+  for (const [k, x] of Object.entries(v)) {
+    if (SAFE_INT_FIELDS.has(k) && isWideInt(x)) out[k] = Number(x);
+    else if (BIG_INT_FIELDS.has(k) && isWideInt(x)) out[k] = BigInt(x);
+    else out[k] = readInts(x);
+  }
+  return out;
+}
+
 // One fetch against an explicit base; throws on !ok (status attached) or timeout. No failover.
 async function rawFetch(base, path, params, timeoutMs = 8000) {
   const ctl = new AbortController();
@@ -57,7 +83,7 @@ async function rawFetch(base, path, params, timeoutMs = 8000) {
     const res = await fetch(buildUrl(base, path, params), { headers: { Accept: "application/json" }, signal: ctl.signal });
     const text = await res.text();
     let body; try { body = text ? JSON.parse(text) : {}; } catch { body = { error: text }; }
-    if (res.ok) return body;
+    if (res.ok) return readInts(body);
     const e = new Error(body && body.error ? body.error : `HTTP ${res.status}`); e.status = res.status; throw e;
   } finally { clearTimeout(t); }
 }
@@ -71,7 +97,7 @@ async function backboneGet(path, params) {
     catch (e) { lastErr = e; rotateNode(); continue; }
     const text = await res.text();
     let body; try { body = text ? JSON.parse(text) : {}; } catch { body = { error: text }; }
-    if (res.ok) return body;
+    if (res.ok) return readInts(body);
     if (res.status >= 500 && attempt < NODES.length - 1) { lastErr = new Error((body && body.error) || `HTTP ${res.status}`); rotateNode(); continue; }
     const e = new Error((body && body.error) || `HTTP ${res.status}`); e.status = res.status; throw e;
   }
@@ -135,7 +161,7 @@ const targetEl = (t) => {
     bits == null ? "" : ` · difficulty ~2^${bits}`
   );
 };
-const num = (n) => (n == null ? "—" : Number(n).toLocaleString());
+const num = (n) => (n == null ? "—" : typeof n === "bigint" ? n.toLocaleString() : Number(n).toLocaleString());
 const fmtTime = (ms) => (ms == null ? "—" : new Date(Number(ms)).toLocaleString());
 const ago = (ms) => {
   if (ms == null) return "";
@@ -695,10 +721,10 @@ async function viewTx(cid) {
   root.appendChild(
     kvRows([
       ["Tx CID", el("span", { class: "mono" }, t.txCID)],
-      // Block linkage (height/hash) and the block timestamp are only shown when
-      // the node supplies them — a content-addressed node has no tx→block
-      // reverse index, so a directly-fetched transaction omits them rather than
-      // rendering dead "#—" links.
+      // Block linkage (height/hash) and the block timestamp are shown only when
+      // the node reports the transaction in its canonical chain; a pending,
+      // unmined or reorged-out transaction (or an older node) omits them rather
+      // than rendering dead "#—" links.
       ["Block", t.blockHeight != null ? blockLink(t.blockHeight, "#" + num(t.blockHeight)) : undefined],
       ["Block hash", t.blockHash != null ? blockLink(t.blockHash, t.blockHash) : undefined],
       ["Timestamp", t.timestamp != null ? `${fmtTime(t.timestamp)} (${ago(t.timestamp)})` : undefined],
@@ -714,13 +740,14 @@ async function viewTx(cid) {
     root.appendChild(el("h2", {}, `Balance changes (${acts.length})`));
     const tbody = el("tbody");
     for (const a of acts) {
-      const pos = Number(a.delta) >= 0;
+      const delta = BigInt(a.delta);
+      const pos = delta >= 0n;
       tbody.appendChild(
         el(
           "tr",
           {},
           el("td", {}, addrLink(a.owner, a.owner)),
-          el("td", { class: "num delta" }, `${pos ? "+" : "−"}${num(Math.abs(Number(a.delta)))}`)
+          el("td", { class: "num delta" }, `${pos ? "+" : "−"}${num(pos ? delta : -delta)}`)
         )
       );
     }
