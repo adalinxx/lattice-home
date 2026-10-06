@@ -152,6 +152,21 @@ const blockLink = (id, text) => link(`#/block/${encodeURIComponent(id)}${chainQ(
 const txLink = (cid, text) => link(`#/tx/${encodeURIComponent(cid)}${chainQ()}`, text || hashEl(cid), "mono");
 const addrLink = (a, text) => link(`#/address/${encodeURIComponent(a)}${chainQ()}`, text || hashEl(a), "mono");
 
+function tokenLink(chainPath, side) {
+  const base = CFG.tokenUrl || "../token/";
+  const url = new URL(base, window.location.href);
+  url.searchParams.set("chain", chainPath);
+  url.hash = `#/market/${side}`;
+  return url.toString();
+}
+
+function appendMarketActions(root, chainPath) {
+  const tokenName = chainPath.split("/").pop();
+  root.appendChild(el("div", { class: "market-actions" },
+    link(tokenLink(chainPath, "buy"), `Buy ${tokenName}`, "btn btn--primary"),
+    link(tokenLink(chainPath, "sell"), `Sell ${tokenName}`, "btn")));
+}
+
 function setView(node) {
   const v = $("#view");
   v.innerHTML = "";
@@ -383,6 +398,7 @@ function renderOfflineChain(chainPath) {
   const root = el("div");
   root.appendChild(chainCrumbs(chainPath));
   root.appendChild(el("h1", {}, chainPath.split("/").pop()));
+  appendMarketActions(root, chainPath);
   root.appendChild(el("p", { class: "empty" },
     `No read endpoint for ${chainPath} was found reporting the block its parent commits. The chain itself may be perfectly alive — a browser page is a convenience view, not the trust path.`));
   root.appendChild(el("h3", {}, "Read it sovereignly"));
@@ -437,7 +453,10 @@ async function viewHome() {
   const root = el("div");
   // Location cue: breadcrumbs on a child chain, a dashboard title at the root. The search bar
   // (below) also navigates to any chain by path, so the path isn't repeated up here.
-  if (state.chain) root.appendChild(chainCrumbs(state.chain));
+  if (state.chain) {
+    root.appendChild(chainCrumbs(state.chain));
+    appendMarketActions(root, state.chain);
+  }
   else root.appendChild(el("h1", {}, "Network overview"));
 
   const cards = el("div", { class: "cards" });
