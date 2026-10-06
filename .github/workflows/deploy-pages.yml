@@ -18,9 +18,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: token/package-lock.json
+      - name: Test and build token module
+        run: |
+          npm ci --prefix token
+          npm test --prefix token
+          npm run build --prefix token
+      - name: Assemble static site
+        run: |
+          mkdir _site
+          rsync -a --exclude '.git/' --exclude '_site/' --exclude 'token/' ./ _site/
+          mkdir _site/token
+          cp -R token/dist/. _site/token/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
