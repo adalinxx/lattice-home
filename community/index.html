@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Community — Lattice</title>
+<meta name="description" content="Run a node, launch a child chain, mine, build, and contribute to Lattice.">
+<link rel="icon" href="../lattice-mark.svg">
+<style>
+:root {
+  --paper: #fff; --ink: #0a0a0a; --ink-soft: #333; --line: #e6e6e6;
+  --font: ui-monospace, "Berkeley Mono", "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+  --fs-12: .75rem; --fs-14: .875rem; --fs-16: 1rem; --fs-20: 1.25rem; --fs-28: 1.75rem;
+  --lh-body: 1.6; --track-display: .08em;
+  --s-1: 4px; --s-2: 8px; --s-3: 16px; --s-4: 24px; --s-5: 40px; --s-6: 64px;
+  --rule: 1px solid var(--line); --measure: 66ch;
+}
+@media (prefers-color-scheme: dark) { :root { --paper: #0a0a0a; --ink: #ededed; --ink-soft: #bdbdbd; --line: #1c1c1c; } }
+* { box-sizing: border-box; }
+html { font-family: var(--font); font-size: 18px; line-height: var(--lh-body); -webkit-text-size-adjust: 100%; }
+body { margin: 0; padding: 0 var(--s-4); background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+nav, main, footer { max-width: 880px; margin: 0 auto; }
+nav { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-4) 0; font-size: var(--fs-14); }
+nav a { text-decoration: none; }
+.brand { display: inline-flex; align-items: center; gap: var(--s-2); }
+.links { margin-left: auto; display: flex; gap: var(--s-3); }
+.wordmark, h1, h2, h3 { text-transform: uppercase; letter-spacing: var(--track-display); font-weight: 600; }
+h1 { margin: 0 0 var(--s-3); font-size: var(--fs-28); }
+h2 { margin: 0 0 var(--s-3); font-size: var(--fs-20); }
+h3 { margin: 0 0 var(--s-2); font-size: var(--fs-14); }
+p { max-width: var(--measure); margin: 0 0 var(--s-3); color: var(--ink-soft); }
+a { color: inherit; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.intro { padding: var(--s-6) 0; border-top: var(--rule); }
+.intro p { font-size: var(--fs-20); }
+section { padding: var(--s-5) 0; border-top: var(--rule); }
+.paths { display: grid; grid-template-columns: repeat(2, 1fr); border-top: var(--rule); border-left: var(--rule); }
+.path { min-width: 0; padding: var(--s-4); border-right: var(--rule); border-bottom: var(--rule); text-decoration: none; }
+.path:hover h3 { text-decoration: underline; text-underline-offset: 3px; }
+.path p { margin: 0; font-size: var(--fs-14); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.btn { display: inline-block; border: var(--rule); padding: var(--s-2) var(--s-3); text-decoration: none; text-transform: uppercase; letter-spacing: var(--track-display); font-size: var(--fs-14); }
+.btn.primary { background: var(--ink); color: var(--paper); }
+.btn:hover { background: var(--ink); color: var(--paper); }
+footer { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-6) 0; border-top: var(--rule); font-size: var(--fs-12); }
+footer .links { margin-left: auto; }
+@media (max-width: 640px) {
+  nav { align-items: flex-start; }
+  nav .links { justify-content: flex-end; flex-wrap: wrap; gap: var(--s-2) var(--s-3); }
+  .paths { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<nav>
+  <a class="brand" href="../" aria-label="Lattice home"><img src="../lattice-mark.svg" width="22" height="22" alt=""><span class="wordmark">LATTICE</span></a>
+  <span class="links">
+    <a href="https://github.com/adalinxx/lattice-node/tree/main/docs">Docs</a>
+    <a href="../explorer/">Explorer</a>
+    <a href="./" aria-current="page">Community</a>
+    <a href="https://github.com/adalinxx">GitHub</a>
+  </span>
+</nav>
+
+<main>
+  <header class="intro">
+    <h1>Build Lattice together</h1>
+    <p>Run the network, launch a sovereign chain, improve the protocol, or help someone else get started.</p>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/adalinxx/lattice-node/discussions">Join the discussion</a>
+      <a class="btn" href="https://github.com/adalinxx/lattice-node/issues">Find an issue</a>
+    </div>
+  </header>
+
+  <section aria-labelledby="choose-path">
+    <h2 id="choose-path">Choose a path</h2>
+    <div class="paths">
+      <a class="path" href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md"><h3>Run a node</h3><p>Join Nexus, verify the chain, and serve the network.</p></a>
+      <a class="path" href="https://github.com/adalinxx/lattice-node/blob/main/docs/getting-started.md"><h3>Launch a child chain</h3><p>Create and host a chain beneath Nexus or another parent.</p></a>
+      <a class="path" href="https://github.com/adalinxx/lattice-node/blob/main/docs/mining-workers.md"><h3>Mine</h3><p>Secure every subscribed chain with one proof-of-work search.</p></a>
+      <a class="path" href="https://github.com/adalinxx/lattice-node/blob/main/docs/protocol.md"><h3>Understand the protocol</h3><p>Read the consensus, state, and cross-chain design.</p></a>
+      <a class="path" href="https://github.com/adalinxx/lattice-node"><h3>Build software</h3><p>Work on the node, wallet, explorer, miners, or SDK.</p></a>
+      <a class="path" href="https://github.com/adalinxx/lattice-node/discussions"><h3>Help the community</h3><p>Answer questions, improve guides, and share what you learn.</p></a>
+    </div>
+  </section>
+
+  <section aria-labelledby="talk">
+    <h2 id="talk">Talk where the work happens</h2>
+    <p>GitHub Discussions is the community forum for questions, ideas, operator help, and proposals. Decisions that affect the protocol belong in durable public threads, close to the code and specifications.</p>
+    <p><a href="https://github.com/adalinxx/lattice-node/discussions">Open Discussions</a> · <a href="https://github.com/adalinxx/lattice-node/issues">Report a problem</a></p>
+  </section>
+
+  <section aria-labelledby="standards">
+    <h2 id="standards">Contribute safely</h2>
+    <p>Contributions are welcome from pseudonymous and identified participants alike. Keep technical claims reproducible, disclose security problems privately, and treat other contributors with respect.</p>
+    <p><a href="../CONTRIBUTING.md">Contribution guide</a> · <a href="../CODE_OF_CONDUCT.md">Code of conduct</a> · <a href="../SECURITY.md">Security policy</a></p>
+  </section>
+</main>
+
+<footer>
+  <span class="wordmark">LATTICE</span>
+  <span class="links"><a href="../">Home</a><a href="https://github.com/adalinxx/lattice-node/tree/main/docs">Docs</a><a href="../explorer/">Explorer</a></span>
+</footer>
+</body>
+</html>
