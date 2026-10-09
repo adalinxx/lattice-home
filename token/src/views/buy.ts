@@ -39,15 +39,19 @@ export function buyView(root: HTMLElement, childPath: string): void {
         </div>
         <div id="offer-list" class="offer-list"></div>
         <button id="offer-more" class="wide" type="button" hidden>Show more</button>
-        <div class="offer-summary">
-          <span id="offer-total">Nothing selected</span>
-          <button id="offer-continue" class="primary" type="button" disabled>Continue</button>
-        </div>
-        <div id="form-error" class="form-error" role="alert" hidden></div>
         <p class="order-disclaimer">This list comes from the chain's node and is not verified here. Your wallet checks every selected order before you approve a payment. Orders already paid for by someone else are left out.</p>
       </div>
     </section>
-    <section id="review" class="review simple-review" hidden aria-live="polite"></section>`;
+    <section id="review" class="review simple-review" hidden aria-live="polite"></section>
+    <div class="offer-bar" role="region" aria-label="Your selection">
+      <div class="offer-bar-inner">
+        <div id="form-error" class="form-error" role="alert" hidden></div>
+        <div class="offer-summary">
+          <span id="offer-total" aria-live="polite">Nothing selected</span>
+          <button id="offer-continue" class="primary" type="button" disabled>Continue</button>
+        </div>
+      </div>
+    </div>`;
 
   const status = root.querySelector<HTMLElement>("#offer-status")!;
   const list = root.querySelector<HTMLElement>("#offer-list")!;
