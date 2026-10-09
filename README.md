@@ -18,10 +18,19 @@ House line: **One proof. Every chain.**
 
 - `index.html` — the whole site, one page. Design tokens (zero-accent; source of truth: `lattice-design`) are inlined so it paints in a single request. A small inline script feeds the live Network table from the public seed nodes.
 - `explorer/` — the Nexus block explorer, vendored in (client-side, talks to the nodes directly). Served at `/explorer/`.
+- `token/` — the cross-chain Buy/Sell module. It stages wallet requests and is built to `/token/` during deployment.
 - `lattice-mark.svg` — the mark (favicon).
 - `.nojekyll` — so GitHub Pages serves the explorer assets raw.
 
-No build step, no web fonts, no images. The only JavaScript is the Network status poll and the explorer app — both client-side, no backend. Open `index.html` directly, or serve the folder statically.
+The home page and explorer remain plain static files. The token module uses Vite and is the only build step:
+
+```sh
+npm ci --prefix token
+npm test --prefix token
+npm run build --prefix token
+```
+
+Pull requests run the same test and build. The Pages workflow builds in a job that can only read the repository, then publishes the static root and explorer alongside `token/dist` at `/token/` from a separate job that runs no repository code. Everything remains client-side with no website signing bridge or backend.
 
 ## Deliberately omitted
 

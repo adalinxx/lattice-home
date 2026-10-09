@@ -75,6 +75,8 @@ tbody tr:hover td { background: var(--line); }
 .table-wrap td.shrink { width: 100%; max-width: 0; }
 .delta { font-variant-numeric: tabular-nums; }
 .crumbs { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: var(--track-display); margin-bottom: var(--s-3); }
+.market-actions { display: flex; gap: var(--s-2); margin: 0 0 var(--s-4); }
+.market-actions .btn { display: inline-block; text-decoration: none; }
 button.more { margin-top: var(--s-3); }
 .empty, .spinner { font-size: var(--fs-14); padding: var(--s-4) 0; }
 .error { border: var(--rule); padding: var(--s-3); }
@@ -90,4 +92,6 @@ code.cid { font-size: var(--fs-14); }
   .kv .row { grid-template-columns: 1fr; }
   .kv .row .key { padding-bottom: 0; }
   .hide-sm { display: none; }
+  .market-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .market-actions .btn { text-align: center; }
 }

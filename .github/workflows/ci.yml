@@ -17,3 +17,8 @@ jobs:
         with:
           node-version: 22
       - run: node test-site.mjs
+      - name: Test and build token module
+        run: |
+          npm ci --ignore-scripts --prefix token
+          npm test --prefix token
+          npm run build --prefix token
