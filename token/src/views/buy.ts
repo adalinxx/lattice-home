@@ -89,7 +89,6 @@ export function buyView(root: HTMLElement, childPath: string): void {
     const box = el("input");
     box.type = "checkbox";
     box.checked = selected.has(key);
-    box.setAttribute("aria-label", `Sell order from ${deposit.demander}`);
     box.addEventListener("change", () => {
       if (box.checked) selected.set(key, deposit); else selected.delete(key);
       withdraw();
@@ -104,6 +103,11 @@ export function buyView(root: HTMLElement, childPath: string): void {
       el("span", "offer-amount", formatUnits(deposit.amountDemanded)),
       el("span", "offer-amount", `${rate.exact ? "" : "≈ "}${formatRate(rate.units)}`));
     const depth = confirmations(deposit, tipHeight);
+    // The whole offer in words: the visual column headings are not announced,
+    // and one seller's orders must not all sound alike.
+    box.setAttribute("aria-label", `Receive ${formatUnits(deposit.amountDeposited)} ${childLabel} for ${formatUnits(deposit.amountDemanded)} ${parentLabel}, `
+      + `a rate of ${rate.exact ? "" : "about "}${formatRate(rate.units)} ${parentLabel} per ${childLabel}, `
+      + `${depth === null ? "confirmations not reported" : `${depth} confirmation${depth === 1n ? "" : "s"}`}, from seller ${deposit.demander}`);
     const confirmed = el("span", "offer-amount offer-confirmations", depth === null ? "—" : depth.toString());
     confirmed.title = depth === null ? "The node did not report this order's block."
       : `In block ${deposit.blockHeight} (${deposit.blockHash}), as reported by the node.`;

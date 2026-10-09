@@ -278,3 +278,9 @@ body:has(.offer-bar) footer { margin-bottom: 104px; }
 @media (hover: none) {
   .handoff-steps .touch-only { display: block; padding: var(--s2) var(--s3); border-left: 3px solid var(--ink); color: var(--ink); }
 }
+
+/* Narrow screens: the unit goes under the number, so a long rate or amount has the whole row. */
+@media (max-width: 560px) {
+  .swap-amount > div { flex-direction: column; align-items: stretch; gap: 0; }
+  .swap-amount input { flex: none; font-size: 1.25rem; }
+}
