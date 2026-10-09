@@ -3,19 +3,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-permissions:
-  contents: read
-  pages: write
-  id-token: write
 concurrency:
   group: pages
   cancel-in-progress: false
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Runs third-party build tooling, so it can read the repository and nothing else.
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,7 +21,7 @@ jobs:
           cache-dependency-path: token/package-lock.json
       - name: Test and build token module
         run: |
-          npm ci --prefix token
+          npm ci --ignore-scripts --prefix token
           npm test --prefix token
           npm run build --prefix token
       - name: Assemble static site
@@ -34,9 +30,20 @@ jobs:
           rsync -a --exclude '.git/' --exclude '_site/' --exclude 'token/' ./ _site/
           mkdir _site/token
           cp -R token/dist/. _site/token/
-      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+  # Publishes the artifact the build produced; runs no repository code.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
       - id: deployment
         uses: actions/deploy-pages@v4

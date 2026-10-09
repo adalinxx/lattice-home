@@ -1,5 +1,5 @@
 import type { OrderIntent } from "../lib/intent.ts";
-import { escapeHTML, formatLAT } from "../lib/format.ts";
+import { escapeHTML, formatUnits } from "../lib/format.ts";
 import { walletIntentQR, walletIntentURI } from "../lib/qr.ts";
 
 /** The chain a page is about, with names escaped for the HTML templates. */
@@ -32,8 +32,8 @@ export function renderReview(review: HTMLElement, intent: OrderIntent, childName
   review.innerHTML = `
     <div class="section-heading"><div><p class="eyebrow">Review</p><h2>${sell ? "Sell child" : "Buy child"}</h2></div><span class="status">${sell ? "limit" : `${intent.deposits.length} selected`}</span></div>
     <dl class="summary compact-summary">
-      <div><dt>You pay</dt><dd>${formatLAT(pay)} ${sell ? childName : parentName}</dd></div>
-      <div><dt>You receive</dt><dd>${formatLAT(receive)} ${sell ? parentName : childName}</dd></div>
+      <div><dt>You pay</dt><dd>${formatUnits(pay)} ${sell ? childName : parentName}</dd></div>
+      <div><dt>You receive</dt><dd>${formatUnits(receive)} ${sell ? parentName : childName}</dd></div>
       <div><dt>Receive in</dt><dd>Account selected in wallet</dd></div>
       <div><dt>Fees</dt><dd>Calculated by wallet</dd></div>
     </dl>
@@ -43,8 +43,7 @@ export function renderReview(review: HTMLElement, intent: OrderIntent, childName
       <div class="qr-frame"><span id="qr-loading">Generating QR…</span><img id="wallet-qr" alt="Wallet order request QR code" hidden/></div>
     </div>
     <textarea id="wallet-request" class="wallet-request" readonly aria-label="Wallet request">${escapeHTML(request)}</textarea>
-    <button id="copy-request" class="wide" type="button">Copy wallet request</button>
-    <a class="button-link primary wide wallet-open" href="${escapeHTML(request)}">Open in wallet</a>`;
+    <button id="copy-request" class="primary wide" type="button">Copy wallet request</button>`;
   review.scrollIntoView({ behavior: "smooth", block: "start" });
   const loading = review.querySelector<HTMLElement>("#qr-loading")!;
   void walletIntentQR(intent).then((url) => {

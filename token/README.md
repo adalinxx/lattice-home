@@ -4,20 +4,24 @@ Chain-specific Buy and Sell pages linked from the Lattice explorer. Each child t
 
 The two order paths map directly to Lattice consensus actions:
 
-- **Sell child · limit:** stage a child-chain `DepositAction`. `amountDeposited` is the child LAT offered and `amountDemanded` is the exact parent LAT required. The order carries these two amounts exactly. The form's exchange rate is a helper: it is filled in from the two amounts when empty, and once set it stays fixed while the two amounts follow each other through it, as on an exchange order form. Rounding to whole atomic units always favours the seller. The rate is never sent.
+- **Sell child · limit:** stage a child-chain `DepositAction`. `amountDeposited` is the child amount offered and `amountDemanded` is the exact parent amount required. The order carries these two amounts exactly. The form's exchange rate is a helper: it is filled in from the two amounts when empty, and once set it stays fixed while the two amounts follow each other through it, as on an exchange order form. Rounding to whole units always favours the seller, and a field the rate cannot express in whole units is emptied instead of keeping a value the rate no longer describes. The rate is never sent.
 - **Buy child · selected deposits:** the Buy page lists the child chain's open sell deposits, cheapest first, and the user ticks the ones to buy. Each is bought whole. The request names those deposits exactly; the wallet creates a parent-chain `ReceiptAction` per deposit in one transaction, then completes a child-chain `WithdrawalAction` for the buyer.
 
 The wallet independently verifies the selected deposits, selects nodes, calculates fees and nonces, constructs the actions, obtains user approval, signs, submits, and persists settlement through deposit → receipt → withdrawal.
+
+### Amounts
+
+Amounts are whole units, typed and shown exactly as the chain stores them and as the explorer and the wallet show them. The page has no decimal denomination of its own, so the number on this page is the number the wallet asks the user to approve. An amount must be above zero and within UInt64.
 
 ### Buy list
 
 The page reads, and does not verify:
 
-1. the child chain's node, found by walking declared endpoints down from the Nexus read service (public https hosts only);
+1. the child chain's node, found by walking declared endpoints down from the Nexus read service (public https hosts only). As in the explorer, a node is used only if it serves the child block its parent commits;
 2. `GET /api/chain/info` and then `GET /api/deposits` on that node, all pages up to a bound, sorted by price with exact integer arithmetic. When a row carries `blockHeight` and `blockHash` (the block that created the deposit), the list shows confirmations: the node's tip height minus that height, plus one. Nodes that do not report it show a dash;
 3. `GET /api/receipt-state` on the parent's node for each deposit about to be shown, so orders someone has already paid for are left out.
 
-The list is a convenience. A node can omit or invent rows; the wallet must prove each selected deposit and that it is unpaid before it signs, and the parent chain rejects a second payment for the same deposit.
+The list is a convenience. Rows a wallet could not buy as given are left out and counted in the status line. A node that limits requests is reported as such, with no automatic retry. A node can omit or invent rows; the wallet must prove each selected deposit and that it is unpaid before it signs, and the parent chain rejects a second payment for the same deposit.
 
 A buy request has this shape (amounts and nonces are decimal strings in atomic units):
 
@@ -51,4 +55,6 @@ Each token page covers one direct parent/child edge. The node exposes active dep
 - An intent contains no nonce, fee, node URL, transaction body, or preimage.
 - Intent IDs are random and expire after 15 minutes.
 - The `chain` URL parameter is accepted only as a well-formed path below Nexus, and page text built from it is escaped.
+- A content security policy allows only the page's own scripts and styles, and requests only to https nodes or a node on this computer.
+- Nothing is kept in browser storage.
 - The wallet reconstructs and presents the final authorization details.

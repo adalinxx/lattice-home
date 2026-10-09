@@ -30,7 +30,7 @@ npm test --prefix token
 npm run build --prefix token
 ```
 
-The Pages workflow publishes the static root and explorer alongside `token/dist` at `/token/`. Everything remains client-side with no website signing bridge or backend.
+Pull requests run the same test and build. The Pages workflow builds in a job that can only read the repository, then publishes the static root and explorer alongside `token/dist` at `/token/` from a separate job that runs no repository code. Everything remains client-side with no website signing bridge or backend.
 
 ## Deliberately omitted
 

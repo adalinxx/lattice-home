@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { byPrice, confirmations, depositKey, parseDepositRow, totals, type Deposit } from "./deposits.ts";
-import { isDeclarableURL, listDeposits, nextOpenDeposits } from "./node.ts";
+import { endpointFor, isDeclarableURL, listDeposits, nextOpenDeposits } from "./node.ts";
 
 const seller = "bafyreibh7ivi6gdwatcnx63uwcgkr5rcygej3lyvgkgma354lnifc6rguy";
 const other = "bafyreiey2mpyfi3k64xe7ixxjyk2uv4hvaqovezmzivccexhekxxp35fee";
@@ -89,9 +89,36 @@ describe("node reads", () => {
     });
     const listing = await listDeposits("https://child.example", ["Nexus", "Payments"]);
     expect(listing.truncated).toBe(false);
+    expect(listing.unusable).toBe(2); // counted, so the page can say rows were left out
     expect(listing.tipHeight).toBe(77n);
     expect(listing.deposits.map((d) => d.depositNonce)).toEqual([2n, 1n, 3n]);
     expect(seen).toEqual(["/api/deposits?after=null&chainPath=Nexus/Payments", "/api/deposits?after=cursor-1&chainPath=Nexus/Payments"]);
+  });
+
+  it("says so when a node is limiting requests", async () => {
+    vi.stubGlobal("fetch", async () => new Response("slow down", { status: 429 }));
+    await expect(listDeposits("https://child.example", ["Nexus", "Payments"])).rejects.toThrow(/limiting requests.*press Refresh/);
+  });
+
+  it("uses a child node only if it serves the block the parent commits", async () => {
+    const committed = "bafyreicso36ijojff6duayrfatyd6wsp4ysxljtnsfqace3gr2rliaz5oq";
+    const asked: string[] = [];
+    const network = (serving: Record<string, string>, listing: Record<string, unknown>) => vi.stubGlobal("fetch", async (input: URL) => {
+      asked.push(input.host + input.pathname);
+      if (input.pathname === "/api/chain/endpoints") return new Response(JSON.stringify(listing));
+      const hash = serving[input.host];
+      return input.pathname === `/api/block/${committed}` && hash ? new Response(JSON.stringify({ hash })) : new Response("{}", { status: 404 });
+    });
+    const declared = { committedBlock: committed, endpoints: ["https://stale.example", "https://intranet", "javascript:alert(1)", "https://good.example/"] };
+    // The first declared node answers with a different block; the page moves on.
+    network({ "stale.example": "bafyreiotherblockotherblockotherblockotherblockotherblockoth", "good.example": committed }, declared);
+    await expect(endpointFor(["Nexus", "Alpha"])).resolves.toBe("https://good.example");
+    expect(asked.some((url) => url.startsWith("intranet"))).toBe(false);
+    // Nothing serves the committed block: no node is used, rather than any that answers.
+    network({ "stale.example": "bafyreiotherblockotherblockotherblockotherblockotherblockoth" }, declared);
+    await expect(endpointFor(["Nexus", "Beta"])).rejects.toThrow(/No reachable node serves the block Nexus commits/);
+    network({}, { endpoints: ["https://good.example"] });
+    await expect(endpointFor(["Nexus", "Gamma"])).rejects.toThrow(/no block committed/);
   });
 
   it("pages through open orders in price order, skipping ones already paid for", async () => {

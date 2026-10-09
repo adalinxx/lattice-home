@@ -6,9 +6,8 @@ import { createTakeIntent, exchangeRate } from "../lib/intent.ts";
 import { confirmations, depositKey, totals, type Deposit } from "../lib/deposits.ts";
 import { endpointFor, listDeposits, nextOpenDeposits } from "../lib/node.ts";
 import { WALLET_REQUEST_MAX } from "../lib/config.ts";
-import { formatLAT, shorten } from "../lib/format.ts";
+import { formatRate, formatUnits, shorten } from "../lib/format.ts";
 import { walletIntentURI } from "../lib/qr.ts";
-import { stageIntent } from "../lib/wallet.ts";
 import { crumbsHTML, market, renderReview } from "./common.ts";
 
 const PAGE = 20;
@@ -66,7 +65,7 @@ export function buyView(root: HTMLElement, childPath: string): void {
   const selected = new Map<string, Deposit>();
   let sorted: Deposit[] = [], cursor = 0, shown = 0, truncated = false;
   let parentNode = "", load = 0;
-  let tipHeight: bigint | null = null;
+  let tipHeight: bigint | null = null, unusable = 0;
 
   const fail = (caught: unknown) => {
     error.textContent = caught instanceof Error ? caught.message : "The sell orders could not be read.";
@@ -78,7 +77,7 @@ export function buyView(root: HTMLElement, childPath: string): void {
     proceed.disabled = chosen.length === 0;
     if (chosen.length === 0) { total.textContent = "Nothing selected"; return; }
     const { pay, receive } = totals(chosen);
-    total.textContent = `${chosen.length} selected · pay ${formatLAT(pay.toString())} ${parentLabel} · receive ${formatLAT(receive.toString())} ${childLabel}`;
+    total.textContent = `${chosen.length} selected · pay ${formatUnits(pay)} ${parentLabel} · receive ${formatUnits(receive)} ${childLabel}`;
   };
 
   const row = (deposit: Deposit): HTMLElement => {
@@ -94,13 +93,13 @@ export function buyView(root: HTMLElement, childPath: string): void {
       summarize();
     });
     const rate = exchangeRate(deposit.amountDeposited, deposit.amountDemanded);
-    const receive = el("span", "offer-amount", formatLAT(deposit.amountDeposited.toString()));
+    const receive = el("span", "offer-amount", formatUnits(deposit.amountDeposited));
     const seller = el("small", "", `from ${shorten(deposit.demander, 8, 6)}`);
     seller.title = deposit.demander;
     receive.append(seller);
     line.append(box, receive,
-      el("span", "offer-amount", formatLAT(deposit.amountDemanded.toString())),
-      el("span", "offer-amount", `${rate.exact ? "" : "≈ "}${formatLAT(rate.units.toString())}`));
+      el("span", "offer-amount", formatUnits(deposit.amountDemanded)),
+      el("span", "offer-amount", `${rate.exact ? "" : "≈ "}${formatRate(rate.units)}`));
     const depth = confirmations(deposit, tipHeight);
     const confirmed = el("span", "offer-amount offer-confirmations", depth === null ? "—" : depth.toString());
     confirmed.title = depth === null ? "The node did not report this order's block."
@@ -121,7 +120,7 @@ export function buyView(root: HTMLElement, childPath: string): void {
       const done = cursor >= sorted.length;
       more.hidden = done;
       status.textContent = shown === 0 && done ? "No open sell orders."
-        : `${shown} open sell order${shown === 1 ? "" : "s"}${done ? "" : " shown"}, cheapest first${truncated && done ? " (the node listed more than this page reads)" : ""}`;
+        : `${shown} open sell order${shown === 1 ? "" : "s"}${done ? "" : " shown"}, cheapest first${truncated && done ? " (the node listed more than this page reads)" : ""}${unusable ? `. ${unusable} listed order${unusable === 1 ? " is" : "s are"} left out: a wallet could not buy ${unusable === 1 ? "it" : "them"} as given` : ""}`;
     } catch (caught) {
       if (run === load) { fail(caught); status.textContent = "Could not check which orders are still open."; more.hidden = false; }
     } finally {
@@ -140,7 +139,7 @@ export function buyView(root: HTMLElement, childPath: string): void {
       const [childNode, parent] = await Promise.all([endpointFor(childParts), endpointFor(parentParts)]);
       const listing = await listDeposits(childNode, childParts);
       if (run !== load) return;
-      parentNode = parent; sorted = listing.deposits; truncated = listing.truncated; tipHeight = listing.tipHeight;
+      parentNode = parent; sorted = listing.deposits; truncated = listing.truncated; tipHeight = listing.tipHeight; unusable = listing.unusable;
       await showMore();
     } catch (caught) {
       if (run === load) { fail(caught); status.textContent = "Sell orders unavailable."; }
@@ -156,7 +155,6 @@ export function buyView(root: HTMLElement, childPath: string): void {
     try {
       const intent = createTakeIntent({ parentChain: parentPath, childChain: childPath, deposits: [...selected.values()] });
       if (walletIntentURI(intent).length > WALLET_REQUEST_MAX) throw new Error("That is more sell orders than one wallet request can carry. Select fewer and buy the rest afterwards.");
-      stageIntent(intent);
       renderReview(review, intent, childName, parentName);
     } catch (caught) { fail(caught); }
   });

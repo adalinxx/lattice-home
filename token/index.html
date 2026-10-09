@@ -4,8 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Stage cross-chain transfers across the Lattice network." />
+    <!-- Own scripts and styles only; requests only to nodes (https, or a node on this computer). -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src https: http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:*; base-uri 'none'; form-action 'none'" />
     <title>Lattice Token</title>
     <link rel="icon" href="./assets/lattice-mark.svg" />
+    <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <div id="app"></div>

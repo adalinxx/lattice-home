@@ -1,17 +1,21 @@
-import { ATOMIC_UNITS_PER_LAT } from "./intent.ts";
+import { RATE_SCALE } from "./intent.ts";
 
-export function formatLAT(value: string): string {
-  const units = BigInt(value);
-  const whole = units / ATOMIC_UNITS_PER_LAT;
-  const fraction = (units % ATOMIC_UNITS_PER_LAT).toString().padStart(8, "0").replace(/0+$/, "");
-  return fraction ? `${whole}.${fraction}` : whole.toString();
+/** An amount in whole units, grouped for reading. The explorer and the wallet
+ * show the same digits. */
+export function formatUnits(value: bigint | string): string {
+  return BigInt(value).toLocaleString("en-US");
+}
+
+/** A RATE_SCALE fixed-point exchange rate as a plain decimal. */
+export function formatRate(rate: bigint): string {
+  const fraction = (rate % RATE_SCALE).toString().padStart(8, "0").replace(/0+$/, "");
+  return fraction ? `${rate / RATE_SCALE}.${fraction}` : (rate / RATE_SCALE).toString();
 }
 
 export function shorten(value: string, head = 10, tail = 8): string {
   if (value.length <= head + tail + 1) return value;
   return `${value.slice(0, head)}…${value.slice(-tail)}`;
 }
-
 
 const HTML_ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 
