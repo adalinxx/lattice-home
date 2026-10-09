@@ -8,7 +8,7 @@ import { endpointFor, listDeposits, nextOpenDeposits } from "../lib/node.ts";
 import { WALLET_REQUEST_MAX } from "../lib/config.ts";
 import { formatRate, formatUnits, shorten } from "../lib/format.ts";
 import { walletIntentURI } from "../lib/qr.ts";
-import { crumbsHTML, market, renderReview } from "./common.ts";
+import { crumbsHTML, market, renderReview, sideSwitchHTML } from "./common.ts";
 
 const PAGE = 20;
 
@@ -24,6 +24,7 @@ export function buyView(root: HTMLElement, childPath: string): void {
   root.innerHTML = `
     <section class="simple-exchange offer-page">
       <nav class="chain-crumbs" aria-label="Chain path">${crumbsHTML(childParts)}</nav>
+      ${sideSwitchHTML("buy")}
       <header class="simple-intro">
         <h1>Buy ${childName}</h1>
         <p>Pay with ${parentName}. Choose the sell orders you want; each is bought whole.</p>
@@ -121,7 +122,7 @@ export function buyView(root: HTMLElement, childPath: string): void {
       for (const deposit of page.open) list.append(row(deposit));
       const done = cursor >= sorted.length;
       more.hidden = done;
-      status.textContent = shown === 0 && done ? "No open sell orders."
+      status.textContent = shown === 0 && done ? `No open sell orders for ${childLabel} right now. Check back later, or offer some yourself under Sell.`
         : `${shown} open sell order${shown === 1 ? "" : "s"}${done ? "" : " shown"}, cheapest first${truncated && done ? " (the node listed more than this page reads)" : ""}${unusable ? `. ${unusable} listed order${unusable === 1 ? " is" : "s are"} left out: a wallet could not buy ${unusable === 1 ? "it" : "them"} as given` : ""}`;
     } catch (caught) {
       if (run === load) { fail(caught); status.textContent = "Could not check which orders are still open."; more.hidden = false; }

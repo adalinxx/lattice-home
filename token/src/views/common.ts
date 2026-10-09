@@ -1,6 +1,7 @@
 import type { OrderIntent } from "../lib/intent.ts";
 import { escapeHTML, formatUnits } from "../lib/format.ts";
 import { walletIntentQR, walletIntentURI } from "../lib/qr.ts";
+import { WALLET_URL } from "../lib/config.ts";
 
 /** The chain a page is about, with names escaped for the HTML templates. */
 export function market(childPath: string) {
@@ -22,7 +23,16 @@ export function crumbsHTML(childParts: readonly string[]): string {
   }).join("<span>/</span>");
 }
 
-/** The handoff: what was staged, and the request to drag, scan or copy. */
+/** Buy and Sell for the same chain, one of them current. The chain stays in
+ * the query string; only the route changes. */
+export function sideSwitchHTML(current: "buy" | "sell"): string {
+  const tab = (side: "buy" | "sell", label: string) =>
+    `<a href="${escapeHTML(location.search)}#/market/${side}"${side === current ? ' aria-current="page"' : ""}>${label}</a>`;
+  return `<nav class="side-switch" aria-label="Buy or sell">${tab("buy", "Buy")}${tab("sell", "Sell")}</nav>`;
+}
+
+/** The handoff: what was staged, how to finish it in the wallet, and the
+ * request to drag, scan or copy. */
 export function renderReview(review: HTMLElement, intent: OrderIntent, childName: string, parentName: string): void {
   const sell = intent.side === "sell_child";
   const request = walletIntentURI(intent);
@@ -30,20 +40,31 @@ export function renderReview(review: HTMLElement, intent: OrderIntent, childName
   const receive = sell ? intent.amountDemanded : intent.deposits.reduce((sum, deposit) => sum + BigInt(deposit.amountDeposited), 0n).toString();
   review.hidden = false;
   review.innerHTML = `
-    <div class="section-heading"><div><p class="eyebrow">Review</p><h2>${sell ? "Sell child" : "Buy child"}</h2></div><span class="status">${sell ? "limit" : `${intent.deposits.length} selected`}</span></div>
+    <div class="section-heading"><div><p class="eyebrow">Review</p><h2>${sell ? "Sell offer" : "Purchase"}</h2></div><span class="status">${sell ? "not yet locked" : `${intent.deposits.length} selected`}</span></div>
     <dl class="summary compact-summary">
-      <div><dt>You pay</dt><dd>${formatUnits(pay)} ${sell ? childName : parentName}</dd></div>
-      <div><dt>You receive</dt><dd>${formatUnits(receive)} ${sell ? parentName : childName}</dd></div>
-      <div><dt>Receive in</dt><dd>Account selected in wallet</dd></div>
+      <div><dt>${sell ? "You lock" : "You pay"}</dt><dd>${formatUnits(pay)} ${sell ? childName : parentName}</dd></div>
+      <div><dt>${sell ? "You receive if filled" : "You receive"}</dt><dd>${formatUnits(receive)} ${sell ? parentName : childName}</dd></div>
+      <div><dt>${sell ? "Paid to" : "Receive in"}</dt><dd>Account selected in wallet</dd></div>
       <div><dt>Fees</dt><dd>Calculated by wallet</dd></div>
     </dl>
-    <p class="wallet-boundary">Nothing has been signed. Import this request into your wallet, which will verify it before asking for approval.</p>
-    <div id="wallet-handoff" class="qr-handoff" draggable="true" title="Drag this order into an open wallet tab">
-      <div><p class="eyebrow">Wallet handoff</p><h3>Drag into wallet</h3><p>Open the wallet in a tab, then drag this card into it. You can also scan or copy the request.</p></div>
-      <div class="qr-frame"><span id="qr-loading">Generating QR…</span><img id="wallet-qr" alt="Wallet order request QR code" hidden/></div>
+    <p class="wallet-boundary">Nothing has been signed or locked. This page only prepared a request; Lattice Wallet checks it and asks for your approval.</p>
+    <div class="handoff-steps">
+      <h3>Finish in Lattice Wallet</h3>
+      <ol>
+        <li>Open Lattice Wallet in your computer's browser. <a href="${WALLET_URL}" target="_blank" rel="noopener noreferrer">Get Lattice Wallet</a></li>
+        <li>In the wallet, open Settings (the Lattice mark) and choose <strong>Open cross-chain order</strong>.</li>
+        <li>Give it this request in any one way: copy it below and paste it into the wallet's text box, then press <strong>Use pasted text</strong>; or scan this QR code from the wallet; or drag the card onto the wallet's tab.</li>
+        <li>Check the terms the wallet shows and approve there.</li>
+      </ol>
+      <p class="touch-only">On a phone or tablet: the wallet is a desktop browser extension. Scan this code from the wallet on your computer, or copy the request and send it to that computer.</p>
+      ${sell ? "" : `<p>Buying selected sell orders needs a wallet version that supports it. An older wallet answers "The order side or type is unsupported"; update it and try again.</p>`}
     </div>
+    <button id="copy-request" class="primary wide" type="button">Copy wallet request</button>
     <textarea id="wallet-request" class="wallet-request" readonly aria-label="Wallet request">${escapeHTML(request)}</textarea>
-    <button id="copy-request" class="primary wide" type="button">Copy wallet request</button>`;
+    <div id="wallet-handoff" class="qr-handoff" draggable="true" title="Drag this card onto an open Lattice Wallet tab">
+      <div><p class="eyebrow">Same request</p><h3>Scan or drag</h3><p>Scan from the wallet's camera, or drag this card onto the wallet's tab.</p></div>
+      <div class="qr-frame"><span id="qr-loading">Generating QR…</span><img id="wallet-qr" alt="Wallet order request QR code" hidden/></div>
+    </div>`;
   review.scrollIntoView({ behavior: "smooth", block: "start" });
   const loading = review.querySelector<HTMLElement>("#qr-loading")!;
   void walletIntentQR(intent).then((url) => {

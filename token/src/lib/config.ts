@@ -5,3 +5,6 @@ export const NEXUS_NODE: string = (import.meta.env?.VITE_NEXUS_URL as string | u
 
 /** The wallet refuses a lattice://order request longer than this. */
 export const WALLET_REQUEST_MAX = 16_384;
+
+/** Where the site sends people for the wallet (the same link as the home page). */
+export const WALLET_URL = "https://github.com/adalinxx/nexus-wallet";

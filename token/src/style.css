@@ -263,3 +263,18 @@ body:has(.offer-bar) footer { margin-bottom: 104px; }
   .offer-summary { font-size: .72rem; }
   body:has(.offer-bar) footer { margin-bottom: 128px; }
 }
+
+.side-switch { display: inline-grid; grid-template-columns: 1fr 1fr; margin-bottom: var(--s3); border: 1px solid var(--line-strong); }
+.side-switch a { padding: 8px 22px; text-align: center; text-decoration: none; text-transform: uppercase; letter-spacing: .08em; font-size: .75rem; }
+.side-switch a[aria-current="page"] { background: var(--ink); color: var(--paper); }
+.offer-terms { display: grid; gap: var(--s2); padding: var(--s3); border-left: 3px solid var(--ink); background: var(--paper); font-size: .78rem; line-height: 1.5; }
+.offer-terms p { margin: 0; }
+.handoff-steps { margin: var(--s4) 0 var(--s3); font-size: .85rem; line-height: 1.6; }
+.handoff-steps h3 { margin: 0 0 var(--s2); text-transform: uppercase; }
+.handoff-steps ol { margin: 0 0 var(--s2); padding-left: 1.3em; }
+.handoff-steps li + li { margin-top: var(--s1); }
+.handoff-steps p { margin: var(--s2) 0 0; color: var(--ink-soft); font-size: .78rem; }
+.touch-only { display: none; }
+@media (hover: none) {
+  .handoff-steps .touch-only { display: block; padding: var(--s2) var(--s3); border-left: 3px solid var(--ink); color: var(--ink); }
+}
