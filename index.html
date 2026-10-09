@@ -81,6 +81,8 @@ figure.term pre code { border: 0; padding: 0; font-size: inherit; color: inherit
   nav { display: flex; align-items: center; gap: var(--s-3);
     padding: var(--s-4) 0; font-size: var(--fs-14); }
   nav a { text-decoration: none; }
+  nav .brand { display: inline-flex; align-items: center; gap: var(--s-2); }
+  nav .links { margin-left: auto; display: flex; align-items: center; gap: var(--s-3); }
   .hero { padding: var(--s-7) var(--s-4); margin: var(--s-4) 0 0;
     border: var(--rule); text-align: center; }
   .hero .wordmark { font-size: var(--fs-44); display: block; margin: 0 0 var(--s-2); }
@@ -104,16 +106,26 @@ figure.term pre code { border: 0; padding: 0; font-size: inherit; color: inherit
   #network .dot { display: inline-block; width: 8px; height: 8px; border: var(--rule);
     margin-right: var(--s-1); vertical-align: baseline; }
   #network .dot.down { background: var(--ink); border-color: var(--ink); }
-  @media (max-width: 640px) { .claims { grid-template-columns: 1fr; } }
+  @media (max-width: 720px) {
+    nav { align-items: flex-start; }
+    nav .links { justify-content: flex-end; flex-wrap: wrap; gap: var(--s-2) var(--s-3); }
+    .claims { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
 
   <nav>
-    <a href="#quickstart">Quickstart</a>
-    <a href="#build">Build</a>
-    <a href="#spec">Spec</a>
-    <a href="#network">Network</a>
+    <a class="brand" href="./" aria-label="Lattice home">
+      <img src="./lattice-mark.svg" width="22" height="22" alt="">
+      <span class="wordmark">LATTICE</span>
+    </a>
+    <span class="links">
+      <a href="https://github.com/adalinxx/lattice-node/tree/main/docs">Docs</a>
+      <a href="./explorer/">Explorer</a>
+      <a href="./community/">Community</a>
+      <a href="https://github.com/adalinxx">GitHub</a>
+    </span>
   </nav>
 
 <main>
@@ -220,6 +232,8 @@ curl -s http://127.0.0.1:8080/health</code></pre>
   <footer>
     <span class="wordmark">LATTICE</span>
     <span class="links">
+      <a href="https://github.com/adalinxx/lattice-node/tree/main/docs">Docs</a>
+      <a href="./community/">Community</a>
       <a href="https://github.com/adalinxx">Code</a>
     </span>
   </footer>

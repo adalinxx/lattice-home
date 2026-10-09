@@ -49,6 +49,32 @@ function isDeclarableUrl(u) {
   } catch { return false; }
 }
 
+// Wide consensus integers arrive as canonical decimal strings (current nodes) or JSON
+// numbers (older nodes, during the rollout). Normalize both at this one boundary, by field
+// name: heights and millisecond timestamps stay well under 2^53, so they become Numbers;
+// balances, nonces, deltas and amounts can exceed it, so they become BigInts.
+const SAFE_INT_FIELDS = new Set([
+  "height", "blockHeight", "timestamp", "nextBefore", "revision",
+  "targetBlockTime", "halvingInterval", "halfLife",
+]);
+const BIG_INT_FIELDS = new Set([
+  "balance", "nonce", "delta", "amountDemanded", "amountDeposited", "amountWithdrawn",
+  "rewardCredited", "rewardAmount", "initialReward", "premine", "minRelayFee",
+  "maxNumberOfTransactionsPerBlock",
+]);
+const isWideInt = (v) => typeof v === "number" ? Number.isInteger(v) : typeof v === "string" && /^(?:0|-?[1-9][0-9]*)$/.test(v);
+function readInts(v) {
+  if (Array.isArray(v)) return v.map(readInts);
+  if (v === null || typeof v !== "object") return v;
+  const out = {};
+  for (const [k, x] of Object.entries(v)) {
+    if (SAFE_INT_FIELDS.has(k) && isWideInt(x)) out[k] = Number(x);
+    else if (BIG_INT_FIELDS.has(k) && isWideInt(x)) out[k] = BigInt(x);
+    else out[k] = readInts(x);
+  }
+  return out;
+}
+
 // One fetch against an explicit base; throws on !ok (status attached) or timeout. No failover.
 async function rawFetch(base, path, params, timeoutMs = 8000) {
   const ctl = new AbortController();
@@ -57,7 +83,7 @@ async function rawFetch(base, path, params, timeoutMs = 8000) {
     const res = await fetch(buildUrl(base, path, params), { headers: { Accept: "application/json" }, signal: ctl.signal });
     const text = await res.text();
     let body; try { body = text ? JSON.parse(text) : {}; } catch { body = { error: text }; }
-    if (res.ok) return body;
+    if (res.ok) return readInts(body);
     const e = new Error(body && body.error ? body.error : `HTTP ${res.status}`); e.status = res.status; throw e;
   } finally { clearTimeout(t); }
 }
@@ -71,7 +97,7 @@ async function backboneGet(path, params) {
     catch (e) { lastErr = e; rotateNode(); continue; }
     const text = await res.text();
     let body; try { body = text ? JSON.parse(text) : {}; } catch { body = { error: text }; }
-    if (res.ok) return body;
+    if (res.ok) return readInts(body);
     if (res.status >= 500 && attempt < NODES.length - 1) { lastErr = new Error((body && body.error) || `HTTP ${res.status}`); rotateNode(); continue; }
     const e = new Error((body && body.error) || `HTTP ${res.status}`); e.status = res.status; throw e;
   }
@@ -135,7 +161,7 @@ const targetEl = (t) => {
     bits == null ? "" : ` · difficulty ~2^${bits}`
   );
 };
-const num = (n) => (n == null ? "—" : Number(n).toLocaleString());
+const num = (n) => (n == null ? "—" : typeof n === "bigint" ? n.toLocaleString() : Number(n).toLocaleString());
 const fmtTime = (ms) => (ms == null ? "—" : new Date(Number(ms)).toLocaleString());
 const ago = (ms) => {
   if (ms == null) return "";
@@ -509,13 +535,9 @@ async function viewHome() {
   setView(root);
   chainsSection(chainsHost);
 
-  const count = Math.min(CFG.recentBlocks, tipHeight + 1);
-  const heights = Array.from({ length: count }, (_, i) => tipHeight - i).filter((h) => h >= 0);
-  const blocks = await Promise.all(heights.map((h) => api(`/api/block/${h}`).catch(() => null)));
-  for (const b of blocks) {
-    if (!b) continue;
-    tbody.appendChild(blockRow(b));
-  }
+  const blocks = await recentBlocks(tipHeight, CFG.recentBlocks);
+  if (nav !== _nav) return;
+  for (const b of blocks) tbody.appendChild(blockRow(b));
   if (!tbody.children.length) tbody.appendChild(el("tr", {}, el("td", { colspan: 4, class: "empty" }, "No blocks yet.")));
 
   startLiveBlocks(tbody);
@@ -525,7 +547,46 @@ function card(k, v, isNode) {
   return el("div", { class: "card" }, el("div", { class: "k" }, k), el("div", { class: isNode ? "v mono" : "v" }, v));
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Up to `count` block summaries from height `top` down, newest first: one /api/blocks page.
+// A node without that route (404) is read one /api/block/:h at a time — sequential, never a
+// parallel burst into the read replica's per-block rate limit, with one paced retry on 429.
+// A height that cannot be read comes back as { height, unavailable: true }, never dropped.
+async function recentBlocks(top, count) {
+  const heights = Array.from({ length: Math.max(0, Math.min(count, top + 1)) }, (_, i) => top - i);
+  if (!heights.length) return [];
+  const missing = (h) => ({ height: h, unavailable: true });
+  try {
+    const page = await api("/api/blocks", { before: top + 1, limit: heights.length });
+    const byHeight = new Map((page.blocks || []).map((b) => [Number(b.height), b]));
+    return heights.map((h) => byHeight.get(h) || missing(h));
+  } catch (e) {
+    if (e.status !== 404) return heights.map(missing);
+  }
+  const out = [];
+  for (const h of heights) {
+    let b = null;
+    for (let attempt = 0; attempt < 2 && !b; attempt++) {
+      try { b = await api(`/api/block/${h}`); }
+      catch (e) { if (e.status === 429 && attempt === 0) await sleep(1100); else break; }
+    }
+    out.push(b || missing(h));
+  }
+  return out;
+}
+
 function blockRow(b) {
+  if (b.unavailable) {
+    return el(
+      "tr",
+      { "data-height": b.height },
+      el("td", {}, blockLink(b.height, "#" + num(b.height))),
+      el("td", { class: "shrink" }, "unavailable"),
+      el("td", { class: "num" }, "—"),
+      el("td", { class: "hide-sm num" }, "")
+    );
+  }
   return el(
     "tr",
     { "data-height": b.height },
@@ -679,10 +740,10 @@ async function viewTx(cid) {
   root.appendChild(
     kvRows([
       ["Tx CID", el("span", { class: "mono" }, t.txCID)],
-      // Block linkage (height/hash) and the block timestamp are only shown when
-      // the node supplies them — a content-addressed node has no tx→block
-      // reverse index, so a directly-fetched transaction omits them rather than
-      // rendering dead "#—" links.
+      // Block linkage (height/hash) and the block timestamp are shown only when
+      // the node reports the transaction in its canonical chain; a pending,
+      // unmined or reorged-out transaction (or an older node) omits them rather
+      // than rendering dead "#—" links.
       ["Block", t.blockHeight != null ? blockLink(t.blockHeight, "#" + num(t.blockHeight)) : undefined],
       ["Block hash", t.blockHash != null ? blockLink(t.blockHash, t.blockHash) : undefined],
       ["Timestamp", t.timestamp != null ? `${fmtTime(t.timestamp)} (${ago(t.timestamp)})` : undefined],
@@ -698,13 +759,14 @@ async function viewTx(cid) {
     root.appendChild(el("h2", {}, `Balance changes (${acts.length})`));
     const tbody = el("tbody");
     for (const a of acts) {
-      const pos = Number(a.delta) >= 0;
+      const delta = BigInt(a.delta);
+      const pos = delta >= 0n;
       tbody.appendChild(
         el(
           "tr",
           {},
           el("td", {}, addrLink(a.owner, a.owner)),
-          el("td", { class: "num delta" }, `${pos ? "+" : "−"}${num(Math.abs(Number(a.delta)))}`)
+          el("td", { class: "num delta" }, `${pos ? "+" : "−"}${num(pos ? delta : -delta)}`)
         )
       );
     }
@@ -786,10 +848,11 @@ function startLiveBlocks(tbody) {
       const top = tbody.querySelector("tr[data-height]");
       const shown = top ? Number(top.dataset.height) : latest.height - 1;
       const from = Math.max(shown + 1, latest.height - CFG.recentBlocks + 1);
-      for (let h = from; h <= latest.height; h++) {
-        if (tbody.querySelector(`tr[data-height="${h}"]`)) continue;
-        const b = await api(`/api/block/${h}`).catch(() => null);
-        if (!b || !document.body.contains(tbody)) return;
+      if (from > latest.height) return;
+      const fresh = await recentBlocks(latest.height, latest.height - from + 1);
+      if (!document.body.contains(tbody)) return;
+      for (const b of fresh.reverse()) {
+        if (tbody.querySelector(`tr[data-height="${b.height}"]`)) continue;
         const row = blockRow(b);
         row.classList.add("new-row");
         tbody.querySelector("td.empty")?.closest("tr")?.remove();
