@@ -1,4 +1,4 @@
-import { createOrderIntent, type OrderIntent, type OrderSide } from "../lib/intent.ts";
+import { createOrderIntent, demandedForRate, exchangeRate, parseAmount, type OrderIntent, type OrderSide } from "../lib/intent.ts";
 import { stageIntent } from "../lib/wallet.ts";
 import { escapeHTML, formatLAT } from "../lib/format.ts";
 import { walletIntentQR, walletIntentURI } from "../lib/qr.ts";
@@ -47,6 +47,11 @@ export function transferView(root: HTMLElement, initialSide: OrderSide, childPat
             <span>You want</span>
             <div><input name="receiveAmount" inputmode="decimal" placeholder="0.00" autocomplete="off"/><strong>${parentAsset}</strong></div>
           </label>
+          <label class="swap-amount receive-box">
+            <span>Exchange rate</span>
+            <div><input name="rate" inputmode="decimal" placeholder="0.00" autocomplete="off"/><strong>${parentAsset} per ${childAsset}</strong></div>
+          </label>
+          <p id="rate-note" class="order-disclaimer" aria-live="polite"></p>
         `}
 
         <input type="hidden" name="side" value="${initialSide}"/>
@@ -67,6 +72,31 @@ export function transferView(root: HTMLElement, initialSide: OrderSide, childPat
     const receiveInput = form.elements.namedItem("receiveAmount") as HTMLInputElement;
     payInput.addEventListener("input", () => { if (payInput.value) receiveInput.value = ""; });
     receiveInput.addEventListener("input", () => { if (receiveInput.value) payInput.value = ""; });
+  } else {
+    // The two amounts are the order. The rate is derived from them, and typing
+    // a rate rewrites the amount wanted; the rate itself is never sent.
+    const sellInput = form.elements.namedItem("payAmount") as HTMLInputElement;
+    const wantInput = form.elements.namedItem("receiveAmount") as HTMLInputElement;
+    const rateInput = form.elements.namedItem("rate") as HTMLInputElement;
+    const note = root.querySelector<HTMLElement>("#rate-note")!;
+    const units = (input: HTMLInputElement): bigint | null => { try { return parseAmount(input.value); } catch { return null; } };
+    const rateFromAmounts = () => {
+      const sell = units(sellInput), want = units(wantInput);
+      if (sell === null || want === null) { rateInput.value = ""; note.textContent = ""; return; }
+      const rate = exchangeRate(sell, want);
+      rateInput.value = formatLAT(rate.units.toString());
+      note.textContent = rate.exact ? "" : "Rate shown is rounded. The order uses the two amounts exactly.";
+    };
+    const wantFromRate = () => {
+      const sell = units(sellInput), rate = units(rateInput);
+      if (sell === null || rate === null) { note.textContent = ""; return; }
+      const want = demandedForRate(sell, rate);
+      wantInput.value = formatLAT(want.toString());
+      note.textContent = exchangeRate(sell, want).exact ? "" : "Amount wanted was rounded up to a whole unit. The order uses the two amounts exactly.";
+    };
+    sellInput.addEventListener("input", rateFromAmounts);
+    wantInput.addEventListener("input", rateFromAmounts);
+    rateInput.addEventListener("input", wantFromRate);
   }
 
   form.addEventListener("submit", (event) => {

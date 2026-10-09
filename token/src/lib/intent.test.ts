@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { childChainFromQuery, createOrderIntent, isAdjacent, parseAmount, parseChainPath, routeBetween } from "./intent.ts";
+import { childChainFromQuery, createOrderIntent, demandedForRate, exchangeRate, isAdjacent, parseAmount, parseChainPath, routeBetween } from "./intent.ts";
 import { escapeHTML } from "./format.ts";
 
 describe("chain routing", () => {
@@ -91,5 +91,32 @@ describe("page inputs", () => {
 
   it("escapes markup in template text", () => {
     expect(escapeHTML(`<img src=x onerror="a('b')">&`)).toBe("&lt;img src=x onerror=&quot;a(&#39;b&#39;)&quot;&gt;&amp;");
+  });
+});
+
+describe("sell exchange rate", () => {
+  const lat = (value: string) => parseAmount(value);
+
+  it("derives the rate from the two amounts and says when it is rounded", () => {
+    expect(exchangeRate(lat("2"), lat("3"))).toEqual({ units: lat("1.5"), exact: true });
+    expect(exchangeRate(lat("10"), lat("5"))).toEqual({ units: lat("0.5"), exact: true });
+    expect(exchangeRate(lat("3"), lat("1"))).toEqual({ units: 33_333_333n, exact: false });
+    expect(exchangeRate(lat("3"), lat("2"))).toEqual({ units: 66_666_667n, exact: false });
+    expect(() => exchangeRate(0n, lat("1"))).toThrow(/greater than zero/);
+  });
+
+  it("turns a typed rate into the amount wanted, never below the rate", () => {
+    expect(demandedForRate(lat("2"), lat("1.5"))).toBe(lat("3"));
+    expect(demandedForRate(lat("3"), 33_333_333n)).toBe(99_999_999n);
+    expect(demandedForRate(3n, lat("0.5"))).toBe(2n); // 1.5 atomic units rounds up
+    expect(demandedForRate(1n, 1n)).toBe(1n); // never zero
+    expect(() => demandedForRate(lat("1"), 0n)).toThrow(/greater than zero/);
+  });
+
+  it("an exact typed rate reproduces itself from the resulting amounts", () => {
+    for (const [sell, rate] of [["2", "1.5"], ["100", "0.33"], ["0.5", "4"]] as const) {
+      const want = demandedForRate(lat(sell), lat(rate));
+      expect(exchangeRate(lat(sell), want)).toEqual({ units: lat(rate), exact: true });
+    }
   });
 });

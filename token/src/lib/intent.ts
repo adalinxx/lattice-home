@@ -80,6 +80,22 @@ export function parseAmount(value: string): bigint {
   return units;
 }
 
+/** The displayed rate for a sell: parent units per whole child token, in
+ * atomic units, rounded to the nearest. `exact` is false when it was rounded.
+ * A helper for the form only; an order carries its two amounts, never a rate. */
+export function exchangeRate(amountDeposited: bigint, amountDemanded: bigint): { units: bigint; exact: boolean } {
+  if (amountDeposited <= 0n || amountDemanded <= 0n) throw new Error("Both amounts must be greater than zero.");
+  const scaled = amountDemanded * ATOMIC_UNITS_PER_LAT;
+  return { units: (scaled + amountDeposited / 2n) / amountDeposited, exact: scaled % amountDeposited === 0n };
+}
+
+/** The parent amount a typed rate implies for a deposit, rounded up to a whole
+ * atomic unit so the seller never asks for less than the rate they entered. */
+export function demandedForRate(amountDeposited: bigint, rateUnits: bigint): bigint {
+  if (amountDeposited <= 0n || rateUnits <= 0n) throw new Error("The amount and rate must be greater than zero.");
+  return (amountDeposited * rateUnits + ATOMIC_UNITS_PER_LAT - 1n) / ATOMIC_UNITS_PER_LAT;
+}
+
 export function createOrderIntent(input: {
   parentChain: string;
   childChain: string;
