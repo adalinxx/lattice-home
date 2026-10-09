@@ -2,7 +2,7 @@ export const INTENT_VERSION = 1 as const;
 export const ATOMIC_UNITS_PER_LAT = 100_000_000n;
 
 export type OrderSide = "sell_child" | "buy_child";
-export type OrderType = "limit" | "market";
+export type OrderType = "limit" | "take";
 
 interface OrderIntentBase {
   readonly version: typeof INTENT_VERSION;
@@ -10,7 +10,6 @@ interface OrderIntentBase {
   readonly parentChain: readonly string[];
   readonly childChain: readonly string[];
   readonly asset: "LAT";
-  readonly recipient?: string;
   readonly expiresAt: string;
   readonly returnUrl?: string;
 }
@@ -22,14 +21,23 @@ export interface SellLimitIntent extends OrderIntentBase {
   readonly amountDemanded: string;
 }
 
-export interface BuyMarketIntent extends OrderIntentBase {
-  readonly side: "buy_child";
-  readonly orderType: "market";
-  readonly maxAmountDemanded?: string;
-  readonly desiredAmountDeposited?: string;
+/** One sell deposit the buyer chose, identified exactly as consensus keys it. */
+export interface SelectedDeposit {
+  readonly demander: string;
+  readonly amountDemanded: string;
+  readonly amountDeposited: string;
+  readonly depositNonce: string;
 }
 
-export type OrderIntent = SellLimitIntent | BuyMarketIntent;
+/** Buy exactly these deposits. The wallet must prove each one itself; the
+ * list here is a request, not evidence. */
+export interface BuyTakeIntent extends OrderIntentBase {
+  readonly side: "buy_child";
+  readonly orderType: "take";
+  readonly deposits: readonly SelectedDeposit[];
+}
+
+export type OrderIntent = SellLimitIntent | BuyTakeIntent;
 
 export function parseChainPath(value: string): string[] {
   const parts = value.split("/").map((part) => part.trim()).filter(Boolean);
@@ -105,44 +113,69 @@ export function depositedForRate(amountDemanded: bigint, rateUnits: bigint): big
   return amountDeposited > 0n ? amountDeposited : null;
 }
 
-export function createOrderIntent(input: {
-  parentChain: string;
-  childChain: string;
-  side: OrderSide;
-  amount: string;
-  amountBasis?: "parent" | "child";
-  /** Sell only: the exact parent amount demanded for the whole deposit. */
-  amountDemanded?: string;
-  recipient?: string;
-  now?: Date;
-}): OrderIntent {
-  const parentChain = parseChainPath(input.parentChain);
-  const childChain = parseChainPath(input.childChain);
+const ADDRESS = /^bafy[a-z2-7]{20,100}$/;
+const UINT64_MAX = (1n << 64n) - 1n;
+
+function marketPair(parent: string, child: string): { parentChain: string[]; childChain: string[] } {
+  const parentChain = parseChainPath(parent);
+  const childChain = parseChainPath(child);
   if (!isAdjacent(parentChain, childChain) || childChain.length !== parentChain.length + 1) {
     throw new Error("The market must pair a child chain with its direct parent.");
   }
-  const amount = parseAmount(input.amount);
-  // Both sell terms are the amounts the user typed. Deriving one from a price
-  // would round, and the deposit's terms are consensus data.
-  const amountDemanded = input.side === "sell_child" ? parseAmount(input.amountDemanded ?? "") : undefined;
-  const recipient = input.recipient?.trim();
-  if (recipient && !/^bafy[a-z2-7]+$/.test(recipient)) throw new Error("Enter a valid Lattice address.");
+  return { parentChain, childChain };
+}
 
-  const now = input.now ?? new Date();
-  const common: OrderIntentBase = {
+function intentBase(pair: { parentChain: string[]; childChain: string[] }, now = new Date()): OrderIntentBase {
+  return {
     version: INTENT_VERSION,
     intentId: crypto.randomUUID(),
-    parentChain,
-    childChain,
+    parentChain: pair.parentChain,
+    childChain: pair.childChain,
     asset: "LAT",
-    ...(recipient ? { recipient } : {}),
     expiresAt: new Date(now.getTime() + 15 * 60_000).toISOString(),
     ...(typeof location === "undefined" ? {} : { returnUrl: `${location.origin}${location.pathname}#/status` }),
   };
-  if (input.side === "sell_child") {
-    return { ...common, side: "sell_child", orderType: "limit", amountDeposited: amount.toString(), amountDemanded: amountDemanded!.toString() };
-  }
-  return input.amountBasis === "child"
-    ? { ...common, side: "buy_child", orderType: "market", desiredAmountDeposited: amount.toString() }
-    : { ...common, side: "buy_child", orderType: "market", maxAmountDemanded: amount.toString() };
+}
+
+/** A sell: lock `amount` of the child token and demand exactly `amountDemanded`
+ * of the parent token for all of it. Both are the amounts the user typed;
+ * deriving one from a price would round, and the terms are consensus data. */
+export function createSellIntent(input: {
+  parentChain: string;
+  childChain: string;
+  amount: string;
+  amountDemanded: string;
+  now?: Date;
+}): SellLimitIntent {
+  const pair = marketPair(input.parentChain, input.childChain);
+  const amountDeposited = parseAmount(input.amount);
+  const amountDemanded = parseAmount(input.amountDemanded);
+  return { ...intentBase(pair, input.now), side: "sell_child", orderType: "limit", amountDeposited: amountDeposited.toString(), amountDemanded: amountDemanded.toString() };
+}
+
+/** A buy of the exact deposits the user ticked, in atomic units. */
+export function createTakeIntent(input: {
+  parentChain: string;
+  childChain: string;
+  deposits: readonly { demander: string; amountDemanded: bigint; amountDeposited: bigint; depositNonce: bigint }[];
+  now?: Date;
+}): BuyTakeIntent {
+  const pair = marketPair(input.parentChain, input.childChain);
+  if (input.deposits.length === 0) throw new Error("Select at least one sell order.");
+  const seen = new Set<string>();
+  const deposits = input.deposits.map((deposit) => {
+    if (!ADDRESS.test(deposit.demander)) throw new Error("A selected sell order has an invalid seller address.");
+    if (deposit.amountDemanded <= 0n || deposit.amountDeposited <= 0n) throw new Error("A selected sell order has a zero amount.");
+    if (deposit.depositNonce < 0n || [deposit.amountDemanded, deposit.amountDeposited, deposit.depositNonce].some((value) => value > UINT64_MAX)) {
+      throw new Error("A selected sell order is out of range.");
+    }
+    const key = `${deposit.demander}/${deposit.amountDemanded}/${deposit.depositNonce}`;
+    if (seen.has(key)) throw new Error("A sell order was selected twice.");
+    seen.add(key);
+    return {
+      demander: deposit.demander, amountDemanded: deposit.amountDemanded.toString(),
+      amountDeposited: deposit.amountDeposited.toString(), depositNonce: deposit.depositNonce.toString(),
+    };
+  });
+  return { ...intentBase(pair, input.now), side: "buy_child", orderType: "take", deposits };
 }

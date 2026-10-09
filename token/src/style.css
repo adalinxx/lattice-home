@@ -230,3 +230,25 @@ footer { max-width: 1080px; margin: 0 auto; padding: var(--s4); display: flex; j
   .summary dt { padding-bottom: 0; }
   footer { flex-direction: column; }
 }
+
+.offer-page { width: min(100%, 720px); }
+.offer-box { display: grid; gap: var(--s3); padding: var(--s4); border: 1px solid var(--line); background: var(--surface); }
+.offer-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); font-size: .78rem; color: var(--ink-soft); }
+.offer-row { display: grid; grid-template-columns: 28px 1.3fr 1fr 1fr; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3); }
+.offer-labels { padding-bottom: 0; color: var(--ink-soft); font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; }
+.offer-list { border: 1px solid var(--line); }
+.offer-list:empty { display: none; }
+.offer-list .offer-row { cursor: pointer; }
+.offer-list .offer-row + .offer-row { border-top: 1px solid var(--line); }
+.offer-list .offer-row:hover, .offer-list .offer-row:has(input:checked) { background: var(--paper); box-shadow: inset 3px 0 0 var(--ink); }
+.offer-row input[type="checkbox"] { width: 18px; height: 18px; padding: 0; border: 0; accent-color: var(--ink); cursor: pointer; }
+.offer-amount { min-width: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.offer-amount small { display: block; color: var(--ink-soft); font-size: .62rem; }
+.offer-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding-top: var(--s3); border-top: 1px solid var(--line); font-size: .8rem; }
+@media (max-width: 560px) {
+  .offer-row { grid-template-columns: 24px 1fr 1fr; }
+  .offer-row > :nth-child(4) { grid-column: 2 / -1; color: var(--ink-soft); font-size: .72rem; }
+  .offer-list .offer-row > :nth-child(4)::before { content: "rate "; }
+  .offer-labels > :nth-child(4) { display: none; }
+  .offer-summary { flex-direction: column; align-items: stretch; }
+}

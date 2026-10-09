@@ -22,12 +22,10 @@ export function statusView(root: HTMLElement): void {
         <div class="progress-row"><span class="progress-dot"></span><span>${intent.side === "sell_child" ? "Child deposit listed" : "Receipt and child withdrawal"}</span></div>
         <dl class="summary">
           <div><dt>Market</dt><dd>${escapeHTML(intent.childChain.join(" / "))} / ${escapeHTML(intent.parentChain.join(" / "))}</dd></div>
-          <div><dt>Order</dt><dd>${intent.side === "sell_child" ? "Sell child · limit" : "Buy child · market"}</dd></div>
+          <div><dt>Order</dt><dd>${intent.side === "sell_child" ? "Sell child · limit" : `Buy child · ${intent.deposits.length} selected`}</dd></div>
           <div><dt>Amount</dt><dd>${intent.side === "sell_child"
             ? `${formatLAT(intent.amountDeposited)} child token`
-            : intent.maxAmountDemanded
-              ? `${formatLAT(intent.maxAmountDemanded)} parent token`
-              : `${formatLAT(intent.desiredAmountDeposited!)} child token`}</dd></div>
+            : `${formatLAT(intent.deposits.reduce((sum, deposit) => sum + BigInt(deposit.amountDeposited), 0n).toString())} child token`}</dd></div>
           ${receipt ? `<div><dt>Wallet reference</dt><dd class="mono break">${escapeHTML(String(receipt.transferId))}</dd></div>` : ""}
         </dl>
       </section>` : `<a class="button-link primary" href="#/payments/buy">Stage an order</a>`}

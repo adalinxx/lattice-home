@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { childChainFromQuery, createOrderIntent, demandedForRate, depositedForRate, exchangeRate, isAdjacent, parseAmount, parseChainPath, routeBetween } from "./intent.ts";
+import { childChainFromQuery, createSellIntent, createTakeIntent, demandedForRate, depositedForRate, exchangeRate, isAdjacent, parseAmount, parseChainPath, routeBetween } from "./intent.ts";
 import { escapeHTML } from "./format.ts";
 
 describe("chain routing", () => {
@@ -27,21 +27,20 @@ describe("intent inputs", () => {
   });
 
   it("maps a limit sell to exact deposit terms", () => {
-    const intent = createOrderIntent({
-      parentChain: "Nexus", childChain: "Nexus/Payments", side: "sell_child",
-      amount: "2", amountDemanded: "3",
+    const intent = createSellIntent({
+      parentChain: "Nexus", childChain: "Nexus/Payments", amount: "2", amountDemanded: "3",
       now: new Date("2026-01-01T00:00:00Z"),
     });
     expect(intent.side).toBe("sell_child");
-    if (intent.side !== "sell_child") throw new Error("expected sell intent");
+    expect(intent.orderType).toBe("limit");
     expect(intent.amountDeposited).toBe("200000000");
     expect(intent.amountDemanded).toBe("300000000");
+    expect(intent.expiresAt).toBe("2026-01-01T00:15:00.000Z");
   });
 
   it("keeps both sell amounts exactly as typed, whatever their ratio", () => {
     const sell = (amount: string, amountDemanded: string) => {
-      const intent = createOrderIntent({ parentChain: "Nexus", childChain: "Nexus/Payments", side: "sell_child", amount, amountDemanded });
-      if (intent.side !== "sell_child") throw new Error("expected sell intent");
+      const intent = createSellIntent({ parentChain: "Nexus", childChain: "Nexus/Payments", amount, amountDemanded });
       return [intent.amountDeposited, intent.amountDemanded];
     };
     // Ratios with no short decimal form: a derived price cannot express them.
@@ -52,31 +51,37 @@ describe("intent inputs", () => {
     expect(sell("0.00000003", "0.00000001")).toEqual(["3", "1"]);
   });
 
-  it("refuses a sell without a demanded amount", () => {
-    const base = { parentChain: "Nexus", childChain: "Nexus/Payments", side: "sell_child" as const, amount: "2" };
-    expect(() => createOrderIntent(base)).toThrow(/amount/);
-    expect(() => createOrderIntent({ ...base, amountDemanded: "0" })).toThrow(/greater than zero/);
+  it("refuses a sell without a demanded amount or off a direct parent", () => {
+    const base = { parentChain: "Nexus", childChain: "Nexus/Payments", amount: "2" };
+    expect(() => createSellIntent({ ...base, amountDemanded: "" })).toThrow(/amount/);
+    expect(() => createSellIntent({ ...base, amountDemanded: "0" })).toThrow(/greater than zero/);
+    expect(() => createSellIntent({ ...base, childChain: "Nexus/A/B", amountDemanded: "1" })).toThrow(/direct parent/);
+  });
+});
+
+describe("buying selected sell orders", () => {
+  const seller = "bafyreibh7ivi6gdwatcnx63uwcgkr5rcygej3lyvgkgma354lnifc6rguy";
+  const deposit = (depositNonce: bigint, amountDeposited = 500n, amountDemanded = 100n) => ({ demander: seller, amountDemanded, amountDeposited, depositNonce });
+  const base = { parentChain: "Nexus", childChain: "Nexus/Payments" };
+
+  it("names each selected deposit by its exact consensus terms", () => {
+    const intent = createTakeIntent({ ...base, deposits: [deposit(1n), deposit(18446744073709551615n, 7n, 3n)], now: new Date("2026-01-01T00:00:00Z") });
+    expect(intent.side).toBe("buy_child");
+    expect(intent.orderType).toBe("take");
+    expect(intent.deposits).toEqual([
+      { demander: seller, amountDemanded: "100", amountDeposited: "500", depositNonce: "1" },
+      { demander: seller, amountDemanded: "3", amountDeposited: "7", depositNonce: "18446744073709551615" },
+    ]);
+    expect(JSON.stringify(intent)).not.toMatch(/maxAmountDemanded|desiredAmountDeposited/);
   });
 
-  it("maps a market buy to a maximum parent spend", () => {
-    const intent = createOrderIntent({
-      parentChain: "Nexus", childChain: "Nexus/Payments", side: "buy_child",
-      amount: "3",
-    });
-    expect(intent.side).toBe("buy_child");
-    if (intent.side !== "buy_child") throw new Error("expected buy intent");
-    expect(intent.maxAmountDemanded).toBe("300000000");
-  });
-
-  it("maps a child amount to a market-buy target", () => {
-    const intent = createOrderIntent({
-      parentChain: "Nexus", childChain: "Nexus/Payments", side: "buy_child",
-      amount: "4", amountBasis: "child",
-    });
-    expect(intent.side).toBe("buy_child");
-    if (intent.side !== "buy_child") throw new Error("expected buy intent");
-    expect(intent.desiredAmountDeposited).toBe("400000000");
-    expect(intent.maxAmountDemanded).toBeUndefined();
+  it("refuses an empty, repeated, malformed or out-of-range selection", () => {
+    expect(() => createTakeIntent({ ...base, deposits: [] })).toThrow(/at least one/);
+    expect(() => createTakeIntent({ ...base, deposits: [deposit(1n), deposit(1n)] })).toThrow(/twice/);
+    expect(() => createTakeIntent({ ...base, deposits: [{ ...deposit(1n), demander: "<img src=x>" }] })).toThrow(/seller address/);
+    expect(() => createTakeIntent({ ...base, deposits: [deposit(1n, 0n)] })).toThrow(/zero amount/);
+    expect(() => createTakeIntent({ ...base, deposits: [deposit(1n << 64n)] })).toThrow(/out of range/);
+    expect(() => createTakeIntent({ ...base, childChain: "Nexus/A/B", deposits: [deposit(1n)] })).toThrow(/direct parent/);
   });
 });
 

@@ -1,5 +1,6 @@
 import "./style.css";
-import { transferView } from "./views/transfer.ts";
+import { sellView } from "./views/transfer.ts";
+import { buyView } from "./views/buy.ts";
 import { statusView } from "./views/status.ts";
 import { childChainFromQuery } from "./lib/intent.ts";
 
@@ -32,7 +33,8 @@ function route(): void {
   const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
   const name = parts[0] === "status" ? "status" : (parts[1] === "sell" ? "sell" : "buy");
   if (name === "status") statusView(view);
-  else transferView(view, name === "sell" ? "sell_child" : "buy_child", selectedChildPath());
+  else if (name === "sell") sellView(view, selectedChildPath());
+  else buyView(view, selectedChildPath());
   window.scrollTo(0, 0);
 }
 
