@@ -1,14 +1,15 @@
 import { createOrderIntent, type OrderIntent, type OrderSide } from "../lib/intent.ts";
 import { stageIntent } from "../lib/wallet.ts";
-import { formatLAT } from "../lib/format.ts";
+import { escapeHTML, formatLAT } from "../lib/format.ts";
 import { walletIntentQR, walletIntentURI } from "../lib/qr.ts";
 
 export function transferView(root: HTMLElement, initialSide: OrderSide, childPath: string): void {
   const childParts = childPath.split("/").filter(Boolean);
-  const childName = childParts.at(-1) ?? "Child";
   const parentParts = childParts.slice(0, -1);
   const parentPath = parentParts.join("/");
-  const parentName = parentParts.at(-1) ?? "Nexus";
+  // Escaped for the templates below; the path itself is validated by the router.
+  const childName = escapeHTML(childParts.at(-1) ?? "Child");
+  const parentName = escapeHTML(parentParts.at(-1) ?? "Nexus");
   const childAsset = childName;
   const parentAsset = parentName;
   const buy = initialSide === "buy_child";
@@ -19,7 +20,7 @@ export function transferView(root: HTMLElement, initialSide: OrderSide, childPat
     const path = childParts.slice(0, index + 1).join("/");
     const url = new URL(explorerBase, location.href);
     url.hash = index === 0 ? "#/" : `#/?c=${encodeURIComponent(path)}`;
-    return `<a href="${url.toString()}">${part}</a>`;
+    return `<a href="${escapeHTML(url.toString())}">${escapeHTML(part)}</a>`;
   }).join("<span>/</span>");
   root.innerHTML = `
     <section class="simple-exchange">
@@ -75,16 +76,13 @@ export function transferView(root: HTMLElement, initialSide: OrderSide, childPat
     try {
       const pay = String(data.get("payAmount") ?? "");
       const receive = String(data.get("receiveAmount") ?? "");
-      if (side === "buy_child" && !pay && !receive) throw new Error(`Enter a ${parentName} or ${childName} amount.`);
-      const payNumber = Number(pay), receiveNumber = Number(receive);
-      const limitPrice = side === "sell_child" && payNumber > 0 && receiveNumber > 0
-        ? String(receiveNumber / payNumber)
-        : undefined;
+      if (side === "buy_child" && !pay && !receive) throw new Error(`Enter a ${parentParts.at(-1)} or ${childParts.at(-1)} amount.`);
+      if (side === "sell_child" && (!pay || !receive)) throw new Error("Enter both the amount you sell and the amount you want.");
       const intent = createOrderIntent({
         parentChain: parentPath, childChain: childPath, side,
         amount: side === "buy_child" && receive ? receive : pay,
         amountBasis: side === "buy_child" && receive ? "child" : "parent",
-        limitPrice,
+        ...(side === "sell_child" ? { amountDemanded: receive } : {}),
       });
       stageIntent(intent);
       renderReview(review, intent, childName, parentName);
@@ -104,7 +102,7 @@ function renderReview(review: HTMLElement, intent: OrderIntent, childName: strin
     <dl class="summary compact-summary">
       <div><dt>You pay</dt><dd>${sell ? `${formatLAT(intent.amountDeposited)} ${childName}` : intent.maxAmountDemanded ? `${formatLAT(intent.maxAmountDemanded)} ${parentName}` : `Calculated from available offers`}</dd></div>
       <div><dt>You receive</dt><dd>${sell ? `${formatLAT(intent.amountDemanded)} ${parentName}` : intent.desiredAmountDeposited ? `${formatLAT(intent.desiredAmountDeposited)} ${childName}` : `Calculated from available offers`}</dd></div>
-      <div><dt>Receive in</dt><dd>${intent.recipient ?? "Account selected in wallet"}</dd></div>
+      <div><dt>Receive in</dt><dd>${intent.recipient ? escapeHTML(intent.recipient) : "Account selected in wallet"}</dd></div>
       <div><dt>Fees</dt><dd>Calculated by wallet</dd></div>
     </dl>
     <p class="wallet-boundary">Nothing has been signed. Import this request into your wallet, which will verify it before asking for approval.</p>

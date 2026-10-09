@@ -1,6 +1,7 @@
 import "./style.css";
 import { transferView } from "./views/transfer.ts";
 import { statusView } from "./views/status.ts";
+import { childChainFromQuery } from "./lib/intent.ts";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const homeUrl = ["127.0.0.1", "localhost"].includes(location.hostname)
@@ -23,9 +24,8 @@ app.innerHTML = `
 
 const view = document.querySelector<HTMLElement>("#view")!;
 function selectedChildPath(): string {
-  const candidate = new URLSearchParams(location.search).get("chain") ?? "Nexus/Payments";
-  const parts = candidate.split("/").filter(Boolean);
-  return parts.length >= 2 && parts[0] === "Nexus" ? parts.join("/") : "Nexus/Payments";
+  const parts = childChainFromQuery(new URLSearchParams(location.search).get("chain"));
+  return parts ? parts.join("/") : "Nexus/Payments";
 }
 
 function route(): void {

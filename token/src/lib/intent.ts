@@ -40,6 +40,18 @@ export function parseChainPath(value: string): string[] {
   return parts;
 }
 
+/** The child chain named by a page URL, or null unless it is a well-formed
+ * path below Nexus. Page markup is built from this value. */
+export function childChainFromQuery(value: string | null): string[] | null {
+  if (!value) return null;
+  try {
+    const parts = parseChainPath(value);
+    return parts.length >= 2 ? parts : null;
+  } catch {
+    return null;
+  }
+}
+
 export function isAdjacent(source: readonly string[], destination: readonly string[]): boolean {
   if (Math.abs(source.length - destination.length) !== 1) return false;
   const shorter = source.length < destination.length ? source : destination;
@@ -74,7 +86,8 @@ export function createOrderIntent(input: {
   side: OrderSide;
   amount: string;
   amountBasis?: "parent" | "child";
-  limitPrice?: string;
+  /** Sell only: the exact parent amount demanded for the whole deposit. */
+  amountDemanded?: string;
   recipient?: string;
   now?: Date;
 }): OrderIntent {
@@ -84,8 +97,9 @@ export function createOrderIntent(input: {
     throw new Error("The market must pair a child chain with its direct parent.");
   }
   const amount = parseAmount(input.amount);
-  const orderType: OrderType = input.side === "sell_child" ? "limit" : "market";
-  const limitPrice = orderType === "limit" ? parseAmount(input.limitPrice ?? "") : undefined;
+  // Both sell terms are the amounts the user typed. Deriving one from a price
+  // would round, and the deposit's terms are consensus data.
+  const amountDemanded = input.side === "sell_child" ? parseAmount(input.amountDemanded ?? "") : undefined;
   const recipient = input.recipient?.trim();
   if (recipient && !/^bafy[a-z2-7]+$/.test(recipient)) throw new Error("Enter a valid Lattice address.");
 
@@ -101,8 +115,7 @@ export function createOrderIntent(input: {
     ...(typeof location === "undefined" ? {} : { returnUrl: `${location.origin}${location.pathname}#/status` }),
   };
   if (input.side === "sell_child") {
-    const amountDemanded = (amount * limitPrice! + ATOMIC_UNITS_PER_LAT - 1n) / ATOMIC_UNITS_PER_LAT;
-    return { ...common, side: "sell_child", orderType: "limit", amountDeposited: amount.toString(), amountDemanded: amountDemanded.toString() };
+    return { ...common, side: "sell_child", orderType: "limit", amountDeposited: amount.toString(), amountDemanded: amountDemanded!.toString() };
   }
   return input.amountBasis === "child"
     ? { ...common, side: "buy_child", orderType: "market", desiredAmountDeposited: amount.toString() }
