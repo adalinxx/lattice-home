@@ -84,9 +84,15 @@ export function sellView(root: HTMLElement, childPath: string): void {
     explain();
   });
 
+  // A staged request describes the form as it was. Any edit withdraws it, so
+  // the card, QR and copy button can never offer terms the form no longer shows.
+  const withdraw = () => { review.hidden = true; review.replaceChildren(); };
+  form.addEventListener("input", withdraw);
+
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     error.hidden = true;
+    withdraw();
     try {
       if (!sellInput.value || !wantInput.value) throw new Error("Enter both the amount you sell and the amount you want.");
       const intent = createSellIntent({ parentChain: parentPath, childChain: childPath, amount: sellInput.value, amountDemanded: wantInput.value });

@@ -67,6 +67,8 @@ export function buyView(root: HTMLElement, childPath: string): void {
   let parentNode = "", load = 0;
   let tipHeight: bigint | null = null, unusable = 0;
 
+  // A staged request describes the selection as it was; any change withdraws it.
+  const withdraw = () => { review.hidden = true; review.replaceChildren(); };
   const fail = (caught: unknown) => {
     error.textContent = caught instanceof Error ? caught.message : "The sell orders could not be read.";
     error.hidden = false;
@@ -89,7 +91,7 @@ export function buyView(root: HTMLElement, childPath: string): void {
     box.setAttribute("aria-label", `Sell order from ${deposit.demander}`);
     box.addEventListener("change", () => {
       if (box.checked) selected.set(key, deposit); else selected.delete(key);
-      review.hidden = true;
+      withdraw();
       summarize();
     });
     const rate = exchangeRate(deposit.amountDeposited, deposit.amountDemanded);
@@ -131,7 +133,7 @@ export function buyView(root: HTMLElement, childPath: string): void {
   const reload = async () => {
     const run = ++load;
     selected.clear(); sorted = []; cursor = 0; shown = 0;
-    list.replaceChildren(); more.hidden = true; error.hidden = true; review.hidden = true;
+    list.replaceChildren(); more.hidden = true; error.hidden = true; withdraw();
     summarize();
     status.textContent = "Finding sell orders…";
     refresh.disabled = true;
@@ -152,6 +154,7 @@ export function buyView(root: HTMLElement, childPath: string): void {
   refresh.addEventListener("click", () => { void reload(); });
   proceed.addEventListener("click", () => {
     error.hidden = true;
+    withdraw();
     try {
       const intent = createTakeIntent({ parentChain: parentPath, childChain: childPath, deposits: [...selected.values()] });
       if (walletIntentURI(intent).length > WALLET_REQUEST_MAX) throw new Error("That is more sell orders than one wallet request can carry. Select fewer and buy the rest afterwards.");
