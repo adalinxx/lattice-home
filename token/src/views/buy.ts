@@ -3,7 +3,7 @@
 // every selected deposit and that nobody has paid for it before it signs.
 
 import { createTakeIntent, exchangeRate } from "../lib/intent.ts";
-import { depositKey, totals, type Deposit } from "../lib/deposits.ts";
+import { confirmations, depositKey, totals, type Deposit } from "../lib/deposits.ts";
 import { endpointFor, listDeposits, nextOpenDeposits } from "../lib/node.ts";
 import { WALLET_REQUEST_MAX } from "../lib/config.ts";
 import { formatLAT, shorten } from "../lib/format.ts";
@@ -35,11 +35,11 @@ export function buyView(root: HTMLElement, childPath: string): void {
           <button id="offer-refresh" type="button">Refresh</button>
         </div>
         <div class="offer-row offer-labels" aria-hidden="true">
-          <span></span><span>You receive · ${childName}</span><span>You pay · ${parentName}</span><span>Rate · ${parentName} per ${childName}</span>
+          <span></span><span>You receive · ${childName}</span><span>You pay · ${parentName}</span><span>Rate · ${parentName} per ${childName}</span><span>Confirmations</span>
         </div>
         <div id="offer-list" class="offer-list"></div>
         <button id="offer-more" class="wide" type="button" hidden>Show more</button>
-        <p class="order-disclaimer">This list comes from the chain's node and is not verified here. Your wallet checks every selected order before you approve a payment. Orders already paid for by someone else are left out.</p>
+        <p class="order-disclaimer">This list comes from the chain's node and is not verified here. Your wallet checks every selected order before you approve a payment. Orders already paid for by someone else are left out. Confirmations count the blocks the node reports on top of an order's own block.</p>
       </div>
     </section>
     <section id="review" class="review simple-review" hidden aria-live="polite"></section>
@@ -66,6 +66,7 @@ export function buyView(root: HTMLElement, childPath: string): void {
   const selected = new Map<string, Deposit>();
   let sorted: Deposit[] = [], cursor = 0, shown = 0, truncated = false;
   let parentNode = "", load = 0;
+  let tipHeight: bigint | null = null;
 
   const fail = (caught: unknown) => {
     error.textContent = caught instanceof Error ? caught.message : "The sell orders could not be read.";
@@ -100,6 +101,11 @@ export function buyView(root: HTMLElement, childPath: string): void {
     line.append(box, receive,
       el("span", "offer-amount", formatLAT(deposit.amountDemanded.toString())),
       el("span", "offer-amount", `${rate.exact ? "" : "≈ "}${formatLAT(rate.units.toString())}`));
+    const depth = confirmations(deposit, tipHeight);
+    const confirmed = el("span", "offer-amount offer-confirmations", depth === null ? "—" : depth.toString());
+    confirmed.title = depth === null ? "The node did not report this order's block."
+      : `In block ${deposit.blockHeight} (${deposit.blockHash}), as reported by the node.`;
+    line.append(confirmed);
     return line;
   };
 
@@ -134,7 +140,7 @@ export function buyView(root: HTMLElement, childPath: string): void {
       const [childNode, parent] = await Promise.all([endpointFor(childParts), endpointFor(parentParts)]);
       const listing = await listDeposits(childNode, childParts);
       if (run !== load) return;
-      parentNode = parent; sorted = listing.deposits; truncated = listing.truncated;
+      parentNode = parent; sorted = listing.deposits; truncated = listing.truncated; tipHeight = listing.tipHeight;
       await showMore();
     } catch (caught) {
       if (run === load) { fail(caught); status.textContent = "Sell orders unavailable."; }

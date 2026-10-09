@@ -234,7 +234,8 @@ footer { max-width: 1080px; margin: 0 auto; padding: var(--s4); display: flex; j
 .offer-page { width: min(100%, 720px); }
 .offer-box { display: grid; gap: var(--s3); padding: var(--s4); border: 1px solid var(--line); background: var(--surface); }
 .offer-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); font-size: .78rem; color: var(--ink-soft); }
-.offer-row { display: grid; grid-template-columns: 28px 1.3fr 1fr 1fr; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3); }
+.offer-row { display: grid; grid-template-columns: 28px 1.3fr 1fr 1fr .7fr; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3); }
+.offer-row > :nth-child(5) { text-align: right; }
 .offer-labels { padding-bottom: 0; color: var(--ink-soft); font-size: .66rem; text-transform: uppercase; letter-spacing: .08em; }
 .offer-list { border: 1px solid var(--line); }
 .offer-list:empty { display: none; }
@@ -254,6 +255,9 @@ body:has(.offer-bar) footer { margin-bottom: 104px; }
   .offer-row { grid-template-columns: 24px 1fr 1fr; }
   .offer-row > :nth-child(4) { grid-column: 2 / -1; color: var(--ink-soft); font-size: .72rem; }
   .offer-list .offer-row > :nth-child(4)::before { content: "rate "; }
+  .offer-row > :nth-child(5) { grid-column: 2 / -1; text-align: left; color: var(--ink-soft); font-size: .72rem; }
+  .offer-list .offer-row > :nth-child(5)::after { content: " confirmations"; }
+  .offer-labels > :nth-child(5) { display: none; }
   .offer-labels > :nth-child(4) { display: none; }
   .offer-bar { padding-left: var(--s3); padding-right: var(--s3); }
   .offer-summary { font-size: .72rem; }

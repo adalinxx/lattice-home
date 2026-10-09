@@ -6,12 +6,16 @@ export interface Deposit {
   amountDemanded: bigint; // parent units asked for the whole deposit
   amountDeposited: bigint; // child units locked
   depositNonce: bigint;
+  /** The block that created the deposit, when the node reports it. */
+  blockHeight?: bigint;
+  blockHash?: string;
 }
 
 const ADDRESS = /^bafy[a-z2-7]{20,100}$/;
+const CID = /^b[a-z2-7]{20,100}$/;
 const UINT64_MAX = (1n << 64n) - 1n;
 
-function unsigned(value: unknown): bigint | null {
+export function unsigned(value: unknown): bigint | null {
   if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return BigInt(value);
   if (typeof value === "string" && /^(0|[1-9][0-9]{0,19})$/.test(value)) {
     const parsed = BigInt(value);
@@ -20,7 +24,7 @@ function unsigned(value: unknown): bigint | null {
   return null;
 }
 
-export const depositKey = (deposit: Deposit): string => `${deposit.demander}/${deposit.amountDemanded}/${deposit.depositNonce}`;
+export const depositKey = (deposit: Pick<Deposit, "demander" | "amountDemanded" | "depositNonce">): string => `${deposit.demander}/${deposit.amountDemanded}/${deposit.depositNonce}`;
 
 /** One row of GET /api/deposits, or null when it is not a usable sell order
  * (malformed, a spent marker, or its key does not match its own fields). */
@@ -30,8 +34,25 @@ export function parseDepositRow(row: unknown): Deposit | null {
   if (typeof demander !== "string" || !ADDRESS.test(demander)) return null;
   const demanded = unsigned(amountDemanded), deposited = unsigned(amountDeposited), depositNonce = unsigned(nonce);
   if (demanded === null || deposited === null || depositNonce === null || demanded === 0n || deposited === 0n) return null;
-  const deposit = { demander, amountDemanded: demanded, amountDeposited: deposited, depositNonce };
-  return key === undefined || key === depositKey(deposit) ? deposit : null;
+  const deposit: Deposit = { demander, amountDemanded: demanded, amountDeposited: deposited, depositNonce };
+  if (key !== undefined && key !== depositKey(deposit)) return null;
+  // Optional, and only as a pair: older nodes, and nodes that no longer hold
+  // the states needed to locate the block, leave them out.
+  const { blockHeight, blockHash } = row as Record<string, unknown>;
+  const height = unsigned(blockHeight);
+  if (height !== null && typeof blockHash === "string" && CID.test(blockHash)) {
+    deposit.blockHeight = height;
+    deposit.blockHash = blockHash;
+  }
+  return deposit;
+}
+
+/** Blocks on the node's chain from the deposit's block to its tip, inclusive.
+ * Null when the node did not say where the deposit is, or its answers do not
+ * fit together (a tip below the deposit's block). The node's word throughout. */
+export function confirmations(deposit: Deposit, tipHeight: bigint | null): bigint | null {
+  if (deposit.blockHeight === undefined || tipHeight === null || tipHeight < deposit.blockHeight) return null;
+  return tipHeight - deposit.blockHeight + 1n;
 }
 
 /** Cheapest first: least parent asked per child unit. Exact; ties go to the

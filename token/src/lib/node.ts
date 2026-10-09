@@ -3,7 +3,7 @@
 // are shown, never trusted: the wallet proves each deposit before it pays.
 
 import { NEXUS_NODE } from "./config.ts";
-import { byPrice, depositKey, parseDepositRow, type Deposit } from "./deposits.ts";
+import { byPrice, depositKey, parseDepositRow, unsigned, type Deposit } from "./deposits.ts";
 
 const TIMEOUT_MS = 8_000;
 const LIST_PAGE = 100;
@@ -76,9 +76,12 @@ async function resolveEndpoint(chain: readonly string[]): Promise<string> {
 }
 
 /** Every sell deposit the child node lists, cheapest first. `truncated` when
- * the node had more pages than this page reads. */
-export async function listDeposits(childNode: string, childChain: readonly string[]): Promise<{ deposits: Deposit[]; truncated: boolean }> {
+ * the node had more pages than this page reads. `tipHeight` is the node's tip
+ * read just before the list, so a confirmation count is never overstated by
+ * blocks that arrived while the list was being read. */
+export async function listDeposits(childNode: string, childChain: readonly string[]): Promise<{ deposits: Deposit[]; truncated: boolean; tipHeight: bigint | null }> {
   const chainPath = childChain.join("/");
+  const tipHeight = await getJSON(childNode, "/api/chain/info", { chainPath }).then((info) => unsigned(info.height), () => null);
   const found = new Map<string, Deposit>();
   let after: string | undefined;
   for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
@@ -89,10 +92,10 @@ export async function listDeposits(childNode: string, childChain: readonly strin
       if (deposit) found.set(depositKey(deposit), deposit);
     }
     // A node with nothing further sends null or omits the cursor.
-    if (typeof body.next !== "string" || body.next === after) return { deposits: [...found.values()].sort(byPrice), truncated: false };
+    if (typeof body.next !== "string" || body.next === after) return { deposits: [...found.values()].sort(byPrice), truncated: false, tipHeight };
     after = body.next;
   }
-  return { deposits: [...found.values()].sort(byPrice), truncated: true };
+  return { deposits: [...found.values()].sort(byPrice), truncated: true, tipHeight };
 }
 
 /** Whether the parent chain already holds a payment for this deposit. */

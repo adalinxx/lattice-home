@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { byPrice, depositKey, parseDepositRow, totals, type Deposit } from "./deposits.ts";
+import { byPrice, confirmations, depositKey, parseDepositRow, totals, type Deposit } from "./deposits.ts";
 import { isDeclarableURL, listDeposits, nextOpenDeposits } from "./node.ts";
 
 const seller = "bafyreibh7ivi6gdwatcnx63uwcgkr5rcygej3lyvgkgma354lnifc6rguy";
@@ -38,6 +38,25 @@ describe("deposit rows", () => {
     expect(byPrice(make(3n, 1n), make(100000000n, 33333333n))).toBe(1);
   });
 
+  it("reads the creating block only as a well-formed pair", () => {
+    const block = "bafyreicso36ijojff6duayrfatyd6wsp4ysxljtnsfqace3gr2rliaz5oq";
+    const row = wire(make(500n, 100n));
+    expect(parseDepositRow({ ...row, blockHeight: "41", blockHash: block })).toEqual({ ...make(500n, 100n), blockHeight: 41n, blockHash: block });
+    for (const partial of [{ blockHeight: "41" }, { blockHash: block }, { blockHeight: "-1", blockHash: block }, { blockHeight: "41", blockHash: "<b>" }, { blockHeight: null, blockHash: null }]) {
+      expect(parseDepositRow({ ...row, ...partial })).toEqual(make(500n, 100n)); // still a usable order, without a block
+    }
+  });
+
+  it("counts confirmations from the deposit's block to the tip, inclusive", () => {
+    const at = (blockHeight: bigint): Deposit => ({ ...make(1n, 1n), blockHeight, blockHash: "b" });
+    expect(confirmations(at(41n), 41n)).toBe(1n);
+    expect(confirmations(at(41n), 50n)).toBe(10n);
+    expect(confirmations(at(0n), 0n)).toBe(1n);
+    expect(confirmations(at(41n), 40n)).toBeNull(); // answers that do not fit together
+    expect(confirmations(at(41n), null)).toBeNull();
+    expect(confirmations(make(1n, 1n), 50n)).toBeNull(); // node did not report a block
+  });
+
   it("totals a selection exactly", () => {
     expect(totals([make(500n, 100n), make(7n, 3n, 2n)])).toEqual({ pay: 103n, receive: 507n });
     expect(totals([])).toEqual({ pay: 0n, receive: 0n });
@@ -61,6 +80,7 @@ describe("node reads", () => {
     const first = [make(100n, 100n, 1n), make(300n, 100n, 2n)], second = [make(1n, 900n, 3n)];
     const seen: string[] = [];
     vi.stubGlobal("fetch", async (input: URL) => {
+      if (input.pathname === "/api/chain/info") return new Response(JSON.stringify({ chain: ["Nexus", "Payments"], height: "77" }));
       seen.push(`${input.pathname}?after=${input.searchParams.get("after")}&chainPath=${input.searchParams.get("chainPath")}`);
       const body = input.searchParams.get("after") === null
         ? { deposits: [...first.map(wire), { demander: "nope" }, { ...wire(make(5n, 5n, 9n)), amountDeposited: "0" }], next: "cursor-1" }
@@ -69,6 +89,7 @@ describe("node reads", () => {
     });
     const listing = await listDeposits("https://child.example", ["Nexus", "Payments"]);
     expect(listing.truncated).toBe(false);
+    expect(listing.tipHeight).toBe(77n);
     expect(listing.deposits.map((d) => d.depositNonce)).toEqual([2n, 1n, 3n]);
     expect(seen).toEqual(["/api/deposits?after=null&chainPath=Nexus/Payments", "/api/deposits?after=cursor-1&chainPath=Nexus/Payments"]);
   });

@@ -14,7 +14,7 @@ The wallet independently verifies the selected deposits, selects nodes, calculat
 The page reads, and does not verify:
 
 1. the child chain's node, found by walking declared endpoints down from the Nexus read service (public https hosts only);
-2. `GET /api/deposits` on that node, all pages up to a bound, sorted by price with exact integer arithmetic;
+2. `GET /api/chain/info` and then `GET /api/deposits` on that node, all pages up to a bound, sorted by price with exact integer arithmetic. When a row carries `blockHeight` and `blockHash` (the block that created the deposit), the list shows confirmations: the node's tip height minus that height, plus one. Nodes that do not report it show a dash;
 3. `GET /api/receipt-state` on the parent's node for each deposit about to be shown, so orders someone has already paid for are left out.
 
 The list is a convenience. A node can omit or invent rows; the wallet must prove each selected deposit and that it is unpaid before it signs, and the parent chain rejects a second payment for the same deposit.
