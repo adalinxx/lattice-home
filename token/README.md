@@ -4,7 +4,7 @@ Chain-specific Buy and Sell pages linked from the Lattice explorer. Each child t
 
 The two supported order paths map directly to Lattice consensus actions:
 
-- **Sell child · limit:** stage a child-chain `DepositAction`. `amountDeposited` is the child LAT offered and `amountDemanded` is the exact parent LAT required. The order carries these two amounts exactly. The form's exchange rate is a helper: it is filled in from the two amounts, and typing a rate rewrites the amount demanded (rounded up to a whole atomic unit). The rate is never sent.
+- **Sell child · limit:** stage a child-chain `DepositAction`. `amountDeposited` is the child LAT offered and `amountDemanded` is the exact parent LAT required. The order carries these two amounts exactly. The form's exchange rate is a helper: it is filled in from the two amounts when empty, and once set it stays fixed while the two amounts follow each other through it, as on an exchange order form. Rounding to whole atomic units always favours the seller. The rate is never sent.
 - **Buy child · market:** select compatible active deposits, create a parent-chain `ReceiptAction` that pays the seller, then complete a child-chain `WithdrawalAction` for the buyer.
 
 The wallet independently verifies active deposits, selects nodes, calculates fees and nonces, constructs the actions, obtains user approval, signs, submits, and persists settlement through deposit → receipt → withdrawal.

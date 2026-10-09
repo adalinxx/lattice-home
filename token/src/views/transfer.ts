@@ -1,4 +1,4 @@
-import { createOrderIntent, demandedForRate, exchangeRate, parseAmount, type OrderIntent, type OrderSide } from "../lib/intent.ts";
+import { createOrderIntent, demandedForRate, depositedForRate, exchangeRate, parseAmount, type OrderIntent, type OrderSide } from "../lib/intent.ts";
 import { stageIntent } from "../lib/wallet.ts";
 import { escapeHTML, formatLAT } from "../lib/format.ts";
 import { walletIntentQR, walletIntentURI } from "../lib/qr.ts";
@@ -73,30 +73,44 @@ export function transferView(root: HTMLElement, initialSide: OrderSide, childPat
     payInput.addEventListener("input", () => { if (payInput.value) receiveInput.value = ""; });
     receiveInput.addEventListener("input", () => { if (receiveInput.value) payInput.value = ""; });
   } else {
-    // The two amounts are the order. The rate is derived from them, and typing
-    // a rate rewrites the amount wanted; the rate itself is never sent.
+    // Price, amount and total as on an exchange order form: the rate stays put
+    // once it is set, and the two amounts follow each other through it. The
+    // order carries the two amounts only; the rate is never sent.
     const sellInput = form.elements.namedItem("payAmount") as HTMLInputElement;
     const wantInput = form.elements.namedItem("receiveAmount") as HTMLInputElement;
     const rateInput = form.elements.namedItem("rate") as HTMLInputElement;
     const note = root.querySelector<HTMLElement>("#rate-note")!;
     const units = (input: HTMLInputElement): bigint | null => { try { return parseAmount(input.value); } catch { return null; } };
-    const rateFromAmounts = () => {
+    const show = (input: HTMLInputElement, value: bigint) => { input.value = formatLAT(value.toString()); };
+    const explain = () => {
       const sell = units(sellInput), want = units(wantInput);
-      if (sell === null || want === null) { rateInput.value = ""; note.textContent = ""; return; }
-      const rate = exchangeRate(sell, want);
-      rateInput.value = formatLAT(rate.units.toString());
-      note.textContent = rate.exact ? "" : "Rate shown is rounded. The order uses the two amounts exactly.";
+      note.textContent = sell !== null && want !== null && !exchangeRate(sell, want).exact
+        ? "Rounded to whole units. The order uses the two amounts exactly as shown."
+        : "";
     };
-    const wantFromRate = () => {
+    const deriveRate = () => {
+      const sell = units(sellInput), want = units(wantInput);
+      if (sell !== null && want !== null) show(rateInput, exchangeRate(sell, want).units);
+    };
+    sellInput.addEventListener("input", () => {
       const sell = units(sellInput), rate = units(rateInput);
-      if (sell === null || rate === null) { note.textContent = ""; return; }
-      const want = demandedForRate(sell, rate);
-      wantInput.value = formatLAT(want.toString());
-      note.textContent = exchangeRate(sell, want).exact ? "" : "Amount wanted was rounded up to a whole unit. The order uses the two amounts exactly.";
-    };
-    sellInput.addEventListener("input", rateFromAmounts);
-    wantInput.addEventListener("input", rateFromAmounts);
-    rateInput.addEventListener("input", wantFromRate);
+      if (sell !== null && rate !== null) show(wantInput, demandedForRate(sell, rate));
+      else deriveRate();
+      explain();
+    });
+    wantInput.addEventListener("input", () => {
+      const want = units(wantInput), rate = units(rateInput);
+      const sell = want !== null && rate !== null ? depositedForRate(want, rate) : null;
+      if (sell !== null) show(sellInput, sell);
+      else if (rate === null) deriveRate();
+      explain();
+    });
+    rateInput.addEventListener("input", () => {
+      const sell = units(sellInput), want = units(wantInput), rate = units(rateInput);
+      if (rate !== null && sell !== null) show(wantInput, demandedForRate(sell, rate));
+      else if (rate !== null && want !== null) { const implied = depositedForRate(want, rate); if (implied !== null) show(sellInput, implied); }
+      explain();
+    });
   }
 
   form.addEventListener("submit", (event) => {

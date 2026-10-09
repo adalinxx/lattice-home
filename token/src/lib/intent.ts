@@ -96,6 +96,15 @@ export function demandedForRate(amountDeposited: bigint, rateUnits: bigint): big
   return (amountDeposited * rateUnits + ATOMIC_UNITS_PER_LAT - 1n) / ATOMIC_UNITS_PER_LAT;
 }
 
+/** The child amount to sell for a wanted parent amount at a typed rate, rounded
+ * down so the seller never gives more than the rate implies. Null when the
+ * wanted amount is too small to sell even one atomic unit at that rate. */
+export function depositedForRate(amountDemanded: bigint, rateUnits: bigint): bigint | null {
+  if (amountDemanded <= 0n || rateUnits <= 0n) throw new Error("The amount and rate must be greater than zero.");
+  const amountDeposited = amountDemanded * ATOMIC_UNITS_PER_LAT / rateUnits;
+  return amountDeposited > 0n ? amountDeposited : null;
+}
+
 export function createOrderIntent(input: {
   parentChain: string;
   childChain: string;

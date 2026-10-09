@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { childChainFromQuery, createOrderIntent, demandedForRate, exchangeRate, isAdjacent, parseAmount, parseChainPath, routeBetween } from "./intent.ts";
+import { childChainFromQuery, createOrderIntent, demandedForRate, depositedForRate, exchangeRate, isAdjacent, parseAmount, parseChainPath, routeBetween } from "./intent.ts";
 import { escapeHTML } from "./format.ts";
 
 describe("chain routing", () => {
@@ -111,6 +111,16 @@ describe("sell exchange rate", () => {
     expect(demandedForRate(3n, lat("0.5"))).toBe(2n); // 1.5 atomic units rounds up
     expect(demandedForRate(1n, 1n)).toBe(1n); // never zero
     expect(() => demandedForRate(lat("1"), 0n)).toThrow(/greater than zero/);
+  });
+
+  it("turns a wanted amount into the amount to sell, never above the rate", () => {
+    expect(depositedForRate(lat("3"), lat("1.5"))).toBe(lat("2"));
+    expect(depositedForRate(lat("1"), lat("3"))).toBe(33_333_333n); // rounded down
+    expect(depositedForRate(1n, lat("3"))).toBeNull(); // less than one atomic unit
+    expect(() => depositedForRate(lat("1"), 0n)).toThrow(/greater than zero/);
+    // Rounding always favours the seller: the effective rate is at least the typed one.
+    const sell = depositedForRate(lat("1"), lat("3"))!;
+    expect(lat("1") * 100_000_000n >= sell * lat("3")).toBe(true);
   });
 
   it("an exact typed rate reproduces itself from the resulting amounts", () => {
