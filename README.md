@@ -17,7 +17,7 @@ House line: **One proof. Every chain.**
 ## Files
 
 - `index.html` — the whole site, one page. Design tokens (zero-accent; source of truth: `lattice-design`) are inlined so it paints in a single request. A small inline script feeds the live Network table from the public seed nodes.
-- `explorer/` — the Nexus block explorer, vendored in (client-side, talks to the nodes directly). Served at `/explorer/`.
+- `explorer/` — the Lattice block explorer, vendored in (client-side, talks to the nodes directly). Served at `/explorer/`.
 - `token/` — the cross-chain Buy/Sell module. It stages wallet requests and is built to `/token/` during deployment.
 - `lattice-mark.svg` — the mark (favicon).
 - `.nojekyll` — so GitHub Pages serves the explorer assets raw.

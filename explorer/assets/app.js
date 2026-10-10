@@ -333,7 +333,7 @@ function statusBadge(status) {
 // Breadcrumb for a chain path: Nexus / Mid / Stable (each segment linkable).
 function chainCrumbs(chainPath) {
   const parts = chainPath.split("/");
-  const crumbs = el("div", { class: "crumbs" }, link("#/", parts[0]));
+  const crumbs = el("div", { class: "crumbs" }, parts.length === 1 ? el("span", {}, parts[0]) : link("#/", parts[0]));
   const acc = [parts[0]];
   for (let i = 1; i < parts.length; i++) {
     acc.push(parts[i]);
@@ -477,12 +477,10 @@ async function viewHome() {
   const tipHeight = Number(latest.height ?? 0);
 
   const root = el("div");
-  // Location cue: breadcrumbs on a child chain, a dashboard title at the root. The search bar
-  // (below) also navigates to any chain by path, so the path isn't repeated up here.
-  if (state.chain) {
-    root.appendChild(chainCrumbs(state.chain));
-    appendMarketActions(root, state.chain);
-  }
+  // Location cue: the chain path on every chain (just "Nexus" at the root), plus a dashboard
+  // title at the root.
+  root.appendChild(chainCrumbs(state.chain || "Nexus"));
+  if (state.chain) appendMarketActions(root, state.chain);
   else root.appendChild(el("h1", {}, "Network overview"));
 
   const cards = el("div", { class: "cards" });
